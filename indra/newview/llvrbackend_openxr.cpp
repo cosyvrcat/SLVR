@@ -539,7 +539,11 @@ bool LLVRBackend::submitEye(int eye, int x, int y, int width, int height)
     }
     XrSwapchainImageWaitInfo wait_info{ XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO };
     wait_info.timeout = XR_INFINITE_DURATION;
-    bool ok = xrOk(xrWaitSwapchainImage(target.swapchain, &wait_info), "xrWaitSwapchainImage");
+    if (!xrOk(xrWaitSwapchainImage(target.swapchain, &wait_info), "xrWaitSwapchainImage"))
+    {
+        return false; // nothing to release: the spec only allows a release after a successful wait
+    }
+    bool ok = index < target.images.size();
     if (ok)
     {
         // Raw copy: with GL_FRAMEBUFFER_SRGB on, the blit would re-encode into an sRGB image.
@@ -571,7 +575,7 @@ bool LLVRBackend::submitEye(int eye, int x, int y, int width, int height)
         if (srgb_was_on) glEnable(GL_FRAMEBUFFER_SRGB);
         if (scissor_was_on) glEnable(GL_SCISSOR_TEST);
     }
-    // Release even after a failed wait or copy, so the swapchain is not left acquired.
+    // Release even after a failed copy, so the swapchain is not left acquired.
     ok = xrOk(xrReleaseSwapchainImage(target.swapchain, nullptr), "xrReleaseSwapchainImage") && ok;
 
     sLayerViews[eye] = { XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW };

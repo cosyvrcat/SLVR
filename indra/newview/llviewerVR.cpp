@@ -16,6 +16,8 @@
 #include "llviewercamera.h"
 #include "llviewercontrol.h"
 #include "llviewerwindow.h"
+#include "llwindow.h"
+#include "pipeline.h"
 
 extern bool gCubeSnapshot;
 
@@ -82,12 +84,17 @@ void LLViewerVR::updateEnabled()
             return;
         }
         // The flat UI is drawn identically into both eyes, which the eyes cannot fuse, so it is
-        // hidden while in VR. shortcut: show the UI on a panel in the world (quad layer) instead.
-        if (hide_ui && gViewerWindow->getUIVisibility())
+        // not rendered while in VR. The render feature flag is used rather than
+        // LLViewerWindow::setUIVisibility(), which would also force third person view.
+        // shortcut: show the UI on a panel in the world (quad layer) instead.
+        if (hide_ui && gPipeline.hasRenderDebugFeatureMask(LLPipeline::RENDER_DEBUG_FEATURE_UI))
         {
-            gViewerWindow->setUIVisibility(false);
+            LLPipeline::setRenderDebugFeatureControl(LLPipeline::RENDER_DEBUG_FEATURE_UI, false);
             mUIHidden = true;
         }
+        // The headset paces the frames; waiting for the monitor's vsync as well would cap and
+        // judder VR at the monitor's refresh rate.
+        gViewerWindow->getWindow()->toggleVSync(false);
     }
     else if (mBackend.isInitialized() && (!enabled || !mBackend.isAlive()))
     {
@@ -99,14 +106,18 @@ void LLViewerVR::updateEnabled()
 
 void LLViewerVR::shutdown()
 {
-    mBackend.shutdown();
     mEye = -1;
     mSecondPass = false;
-    if (mUIHidden && gViewerWindow)
+    if (mBackend.isInitialized() && gViewerWindow)
     {
-        gViewerWindow->setUIVisibility(true);
+        gViewerWindow->getWindow()->toggleVSync(gSavedSettings.getBOOL("RenderVSyncEnable"));
+    }
+    if (mUIHidden)
+    {
+        LLPipeline::setRenderDebugFeatureControl(LLPipeline::RENDER_DEBUG_FEATURE_UI, true);
     }
     mUIHidden = false;
+    mBackend.shutdown();
 }
 
 void LLViewerVR::beginEye()
@@ -127,7 +138,9 @@ void LLViewerVR::beginEye()
         mBaseAt = camera.getAtAxis();
         mBaseLeft = camera.getLeftAxis();
         mBaseUp = camera.getUpAxis();
-        const F32 yaw = atan2f(mBaseAt.mV[VY], mBaseAt.mV[VX]);
+        // Heading from the left axis: it stays horizontal (the camera never rolls), while the
+        // at axis loses its horizontal part when looking straight up or down.
+        const F32 yaw = atan2f(-mBaseLeft.mV[VX], mBaseLeft.mV[VY]);
         mBaseYawCos = cosf(yaw);
         mBaseYawSin = sinf(yaw);
         mEye = 0;
@@ -190,6 +203,7 @@ bool LLViewerVR::endEye()
     LLViewerCamera& camera = LLViewerCamera::instance();
     camera.setOrigin(mBaseOrigin);
     camera.setAxes(mBaseAt, mBaseLeft, mBaseUp);
+    gViewerWindow->setup3DRender(); // re-cache matrices and frustum planes for that camera (picking, name tags)
     return false;
 }
 
