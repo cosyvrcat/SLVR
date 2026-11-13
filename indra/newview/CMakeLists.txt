@@ -854,6 +854,8 @@ set(viewer_SOURCE_FILES
     llviewertextureanim.cpp
     llviewertexturelist.cpp
     llviewerthrottle.cpp
+    llviewerVR.cpp
+    llvrbackend_openxr.cpp
     llviewerwearable.cpp
     llviewerwindow.cpp
     llviewerwindowlistener.cpp
@@ -1722,6 +1724,8 @@ set(viewer_HEADER_FILES
     llviewertextureanim.h
     llviewertexturelist.h
     llviewerthrottle.h
+    llviewerVR.h
+    llvrbackend.h
     llviewerwearable.h
     llviewerwindow.h
     llviewerwindowlistener.h

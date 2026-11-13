@@ -17984,6 +17984,39 @@ Change of this parameter will affect the layout of buttons in notification toast
       <key>Value</key>
       <integer>1</integer>
     </map>
+    <key>VREnabled</key>
+    <map>
+      <key>Comment</key>
+      <string>SLVR: render to the VR headset through OpenXR (toggle with Ctrl+Alt+F7). Never saved, so the viewer always starts outside VR.</string>
+      <key>Persist</key>
+      <integer>0</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
+    <key>VRHideUI</key>
+    <map>
+      <key>Comment</key>
+      <string>SLVR: hide the flat user interface while VR is on (it cannot be viewed comfortably in stereo yet)</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>Boolean</string>
+      <key>Value</key>
+      <integer>1</integer>
+    </map>
+    <key>VRSwapchainFormat</key>
+    <map>
+      <key>Comment</key>
+      <string>SLVR: OpenGL internal format to request for the eye images, 0 = automatic (35907 = GL_SRGB8_ALPHA8, 32856 = GL_RGBA8). Takes effect the next time VR is switched on.</string>
+      <key>Persist</key>
+      <integer>1</integer>
+      <key>Type</key>
+      <string>S32</string>
+      <key>Value</key>
+      <integer>0</integer>
+    </map>
     <key>VelocityInterpolate</key>
     <map>
       <key>Comment</key>

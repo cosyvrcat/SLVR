@@ -37,6 +37,7 @@
 #include "llviewerobjectlist.h"
 #include "llviewerregion.h"
 #include "llviewerwindow.h"
+#include "llviewerVR.h" // SLVR
 #include "llvovolume.h"
 #include "llworld.h"
 #include "lltoolmgr.h"
@@ -378,7 +379,14 @@ void LLViewerCamera::setPerspective(bool for_selection,
 
     calcProjection(z_far); // Update the projection matrix cache
 
-    proj_mat *= glm::perspective(fov_y,aspect,z_near,z_far);
+    if (const F32* t = gVR.eyeTanFov()) // SLVR: asymmetric per-eye projection from the headset
+    {
+        proj_mat *= glm::frustum(t[0] * z_near, t[1] * z_near, t[3] * z_near, t[2] * z_near, z_near, z_far);
+    }
+    else
+    {
+        proj_mat *= glm::perspective(fov_y,aspect,z_near,z_far);
+    }
 
     gGL.loadMatrix(glm::value_ptr(proj_mat));
 

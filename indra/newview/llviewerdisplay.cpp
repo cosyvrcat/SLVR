@@ -81,6 +81,7 @@
 #include "llviewershadermgr.h"
 #include "llviewertexturelist.h"
 #include "llviewerwindow.h"
+#include "llviewerVR.h" // SLVR
 #include "llvoavatarself.h"
 #include "llvograss.h"
 #include "llworld.h"
@@ -859,6 +860,13 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
             gPipeline.toggleRenderType(LLPipeline::RENDER_TYPE_HUD_PARTICLES);
         }
 
+        // SLVR: in VR the scene is rendered once per eye; endEye() below jumps back here.
+        sec:
+        if (!for_snapshot)
+        {
+            gVR.beginEye();
+        }
+
         stop_glerror();
         display_update_camera();
         stop_glerror();
@@ -1178,6 +1186,10 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
         if (!for_snapshot)
         {
             render_ui();
+            if (gVR.endEye()) // SLVR: left eye done, render the right eye
+            {
+                goto sec;
+            }
             swap();
         }
 
@@ -2096,5 +2108,6 @@ void render_disconnected_background()
 
 void display_cleanup()
 {
+    gVR.shutdown(); // SLVR
     gDisconnectedImagep = nullptr;
 }
