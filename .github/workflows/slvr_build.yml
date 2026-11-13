@@ -45,14 +45,14 @@ jobs:
 
       - name: Configure
         run: >
-          autobuild configure -c ReleaseFS -A64 --
+          autobuild configure -c ReleaseFS_open -A64 --
           --package
           -DOPENSIM:BOOL=ON -DHAVOK_TPV:BOOL=OFF
           -DUSE_OPENXR:BOOL=ON
           -DLL_TESTS:BOOL=OFF
 
       - name: Build
-        run: autobuild build -c ReleaseFS -A64 --no-configure
+        run: autobuild build -c ReleaseFS_open -A64 --no-configure
 
       - name: Upload installer
         uses: actions/upload-artifact@v7
