@@ -30,7 +30,6 @@
 #include "pipeline.h"
 
 extern bool gCubeSnapshot;
-void render_ui_2d(); // llviewerdisplay.cpp
 
 LLViewerVR gVR;
 
@@ -321,7 +320,13 @@ void LLViewerVR::drawPanel()
     gGL.setColorMask(true, true); // alpha is what lets the world show through the empty parts
     glClearColor(0.f, 0.f, 0.f, 0.f);
     glClear(GL_COLOR_BUFFER_BIT);
-    render_ui_2d();
+    // Not render_ui_2d(): with RenderUIBuffer on it draws through a render target and then
+    // returns to the window's framebuffer, leaving the panel image empty.
+    // shortcut: translucent UI comes out too transparent (blending squares its alpha on
+    // an empty target); needs a separate alpha blend factor the UI code does not reset.
+    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+    gViewerWindow->setup2DRender();
+    gViewerWindow->draw();
 
     if (mPanelHit)
     {
@@ -334,6 +339,7 @@ void LLViewerVR::drawPanel()
         gUIProgram.unbind();
     }
     gGL.flush();
+    gGL.setColorMask(true, false);
 
     mBackend.endUI(PANEL_CENTRE, PANEL_WIDTH, PANEL_WIDTH * window.getHeight() / window.getWidth());
 }
@@ -346,7 +352,12 @@ void LLViewerVR::onIdle(void* self)
 // Turns the controller state into the viewer's own walking, turning and mouse input.
 void LLViewerVR::applyInput()
 {
-    // Nothing new from the headset (frame not rendered, session lost focus): let go of everything.
+    // No new state from the headset (the runtime skipped a frame): keep what is held, so a
+    // drag survives it. When VR is shutting down, let go of everything.
+    if (!mInputFresh && mBackend.isAlive() && gSavedSettings.getBOOL("VREnabled"))
+    {
+        return;
+    }
     const LLVRInput input = mInputFresh ? mInput : LLVRInput();
     mInputFresh = false;
 
@@ -379,8 +390,7 @@ void LLViewerVR::applyInput()
 
     // Trigger is the left mouse button, grip the right one. On the panel they go through
     // the UI like a mouse click at that spot; elsewhere straight to the current tool, whose
-    // pick then follows the laser (overridePickRay). Releases always take the normal route,
-    // so whoever captured the press gets its release.
+    // pick then follows the laser (overridePickRay). A release takes the route its press took.
     LLWindow* window = gViewerWindow->getWindow();
     const MASK mask = gKeyboard ? gKeyboard->currentMask(true) : MASK_NONE;
     const LLCoordGL pointer(mPointerX, mPointerY);
@@ -398,37 +408,36 @@ void LLViewerVR::applyInput()
     if (input.trigger != mTriggerDown)
     {
         mTriggerDown = input.trigger;
-        if (!input.trigger)
+        if (input.trigger)
         {
-            gViewerWindow->handleMouseUp(window, pointer, mask);
+            mTriggerOnPanel = on_panel;
         }
-        else if (on_panel)
+        if (mTriggerOnPanel)
         {
-            gViewerWindow->handleMouseDown(window, pointer, mask);
+            input.trigger ? gViewerWindow->handleMouseDown(window, pointer, mask)
+                          : gViewerWindow->handleMouseUp(window, pointer, mask);
         }
         else if (LLTool* tool = LLToolMgr::getInstance()->getCurrentTool())
         {
-            tool->handleMouseDown(x, y, mask);
+            input.trigger ? tool->handleMouseDown(x, y, mask) : tool->handleMouseUp(x, y, mask);
         }
     }
     if (input.grip != mGripDown)
     {
         mGripDown = input.grip;
-        if (!input.grip)
+        if (input.grip)
         {
-            gViewerWindow->handleRightMouseUp(window, pointer, mask);
-        }
-        else
-        {
+            mGripOnPanel = on_panel;
             mPanelVisible = true; // the context menu opens on the panel
-            if (on_panel)
-            {
-                gViewerWindow->handleRightMouseDown(window, pointer, mask);
-            }
-            else if (LLTool* tool = LLToolMgr::getInstance()->getCurrentTool())
-            {
-                tool->handleRightMouseDown(x, y, mask);
-            }
+        }
+        if (mGripOnPanel)
+        {
+            input.grip ? gViewerWindow->handleRightMouseDown(window, pointer, mask)
+                       : gViewerWindow->handleRightMouseUp(window, pointer, mask);
+        }
+        else if (LLTool* tool = LLToolMgr::getInstance()->getCurrentTool())
+        {
+            input.grip ? tool->handleRightMouseDown(x, y, mask) : tool->handleRightMouseUp(x, y, mask);
         }
     }
 }

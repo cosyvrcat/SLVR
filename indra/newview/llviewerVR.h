@@ -68,6 +68,7 @@ private:
     F32 mLaserLength = 0.f;
     S32 mPointerX = 0, mPointerY = 0; // where the laser meets the panel: window pixels, origin bottom left
     bool mMenuDown = false, mTriggerDown = false, mGripDown = false, mTurned = false;
+    bool mTriggerOnPanel = false, mGripOnPanel = false; // where the press went; its release follows
 
     // Viewer camera as the agent camera left it this frame: the VR tracking origin.
     LLVector3 mBaseOrigin, mBaseAt, mBaseLeft, mBaseUp;
