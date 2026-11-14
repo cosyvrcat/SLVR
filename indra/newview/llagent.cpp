@@ -34,6 +34,7 @@
 #include "llagentaccess.h"
 #include "llagentbenefits.h"
 #include "llagentcamera.h"
+#include "llviewerVR.h" // SLVR
 #include "llagentlistener.h"
 #include "llagentwearables.h"
 #include "llagentui.h"
@@ -2588,6 +2589,10 @@ bool LLAgent::needsRenderAvatar()
     {
         return false;
     }
+    if (gVR.firstPerson() && !LLVOAvatar::sVisibleInFirstPerson) // SLVR: seen from the avatar's eyes, as in mouselook
+    {
+        return false;
+    }
 
     return mShowAvatar && mOutfitChosen;
 }
@@ -2596,7 +2601,7 @@ bool LLAgent::needsRenderAvatar()
 bool LLAgent::needsRenderHead()
 {
 // [RLVa:KB] - Checked: RLVa-2.0.2
-    return ((LLVOAvatar::sVisibleInFirstPerson && LLPipeline::sReflectionRender) || (mShowAvatar && !gAgentCamera.cameraMouselook())) && (!gRlvHandler.hasBehaviour(RLV_BHVR_SHOWSELFHEAD));
+    return ((LLVOAvatar::sVisibleInFirstPerson && LLPipeline::sReflectionRender) || (mShowAvatar && !gAgentCamera.cameraMouselook() && !gVR.firstPerson() /* SLVR */)) && (!gRlvHandler.hasBehaviour(RLV_BHVR_SHOWSELFHEAD));
 // [/RLVa:KB]
 //  return (LLVOAvatar::sVisibleInFirstPerson && LLPipeline::sReflectionRender) || (mShowAvatar && !gAgentCamera.cameraMouselook());
 }

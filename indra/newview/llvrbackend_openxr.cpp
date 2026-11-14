@@ -56,6 +56,9 @@ namespace
     XrAction sTriggerAction = XR_NULL_HANDLE;
     XrAction sGripAction = XR_NULL_HANDLE;
     XrAction sMenuAction = XR_NULL_HANDLE;
+    XrAction sZoomAction = XR_NULL_HANDLE;
+    XrAction sGrabAction = XR_NULL_HANDLE;
+    GLuint sUIDepth = 0;      // depth buffer for the UI image (HUD attachments need one)
     XrAction sAimAction = XR_NULL_HANDLE;
     XrSpace sAimSpace = XR_NULL_HANDLE;
 
@@ -269,6 +272,8 @@ namespace
             { &sTriggerAction, XR_ACTION_TYPE_BOOLEAN_INPUT, "click", "Click", "/user/hand/right/input/trigger/value" },
             { &sGripAction, XR_ACTION_TYPE_BOOLEAN_INPUT, "context", "Context menu", "/user/hand/right/input/squeeze/value" },
             { &sMenuAction, XR_ACTION_TYPE_BOOLEAN_INPUT, "panel", "Show or hide the UI panel", "/user/hand/left/input/menu/click" },
+            { &sZoomAction, XR_ACTION_TYPE_BOOLEAN_INPUT, "zoom", "Zoom the camera to a point", "/user/hand/left/input/trigger/value" },
+            { &sGrabAction, XR_ACTION_TYPE_BOOLEAN_INPUT, "grab", "Move the UI panel", "/user/hand/left/input/squeeze/value" },
             { &sAimAction, XR_ACTION_TYPE_POSE_INPUT, "aim", "Pointer", "/user/hand/right/input/aim/pose" },
         };
         XrActionSuggestedBinding suggested[LL_ARRAY_SIZE(BINDINGS)];
@@ -339,10 +344,11 @@ namespace
                                    fov.angleLeft * RAD_TO_DEG, fov.angleRight * RAD_TO_DEG,
                                    fov.angleUp * RAD_TO_DEG, fov.angleDown * RAD_TO_DEG)
                        // view flags: 1 orientation valid, 2 position valid, 4 orientation tracked, 8 position tracked
-                       << llformat("; view flags 0x%X; hand %s move (%.2f %.2f) turn (%.2f %.2f) trigger %d grip %d menu %d",
+                       << llformat("; view flags 0x%X; hand %s move (%.2f %.2f) turn (%.2f %.2f) trigger %d grip %d menu %d zoom %d grab %d",
                                    (U32)sViewStateFlags, sLastInput.aim_valid ? "tracked" : "not tracked",
                                    sLastInput.move[0], sLastInput.move[1], sLastInput.turn[0], sLastInput.turn[1],
-                                   (S32)sLastInput.trigger, (S32)sLastInput.grip, (S32)sLastInput.menu)
+                                   (S32)sLastInput.trigger, (S32)sLastInput.grip, (S32)sLastInput.menu,
+                                   (S32)sLastInput.zoom, (S32)sLastInput.grab)
                        << LL_ENDL;
         sStatsStart = Clock::now();
         sStatsFrames = sStatsStereoFrames = 0;
@@ -591,6 +597,11 @@ void LLVRBackend::shutdown()
         destroyTarget(target);
     }
     destroyTarget(sUITarget);
+    if (sUIDepth)
+    {
+        glDeleteRenderbuffers(1, &sUIDepth);
+        sUIDepth = 0;
+    }
     if (sAimSpace != XR_NULL_HANDLE)
     {
         xrOk(xrDestroySpace(sAimSpace), "xrDestroySpace(aim)");
@@ -712,6 +723,8 @@ bool LLVRBackend::getInput(LLVRInput& input)
     input.trigger = readBoolean(sTriggerAction, "xrGetActionStateBoolean(click)");
     input.grip = readBoolean(sGripAction, "xrGetActionStateBoolean(context)");
     input.menu = readBoolean(sMenuAction, "xrGetActionStateBoolean(panel)");
+    input.zoom = readBoolean(sZoomAction, "xrGetActionStateBoolean(zoom)");
+    input.grab = readBoolean(sGrabAction, "xrGetActionStateBoolean(grab)");
 
     XrSpaceLocation location{ XR_TYPE_SPACE_LOCATION };
     const XrSpaceLocationFlags needed = XR_SPACE_LOCATION_POSITION_VALID_BIT | XR_SPACE_LOCATION_ORIENTATION_VALID_BIT;
@@ -747,6 +760,13 @@ bool LLVRBackend::beginUI(int width, int height)
             destroyTarget(sUITarget);
             return false;
         }
+        if (!sUIDepth)
+        {
+            glGenRenderbuffers(1, &sUIDepth);
+        }
+        glBindRenderbuffer(GL_RENDERBUFFER, sUIDepth);
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, width, height);
+        glBindRenderbuffer(GL_RENDERBUFFER, 0);
         LL_INFOS("VR") << "UI panel image: " << width << "x" << height << ", "
                        << sUITarget.images.size() << " images" << LL_ENDL;
     }
@@ -767,11 +787,16 @@ bool LLVRBackend::beginUI(int width, int height)
     {
         glBindFramebuffer(GL_FRAMEBUFFER, sFBO);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, sUITarget.images[index].image, 0);
+        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, sUIDepth);
         status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
     }
     if (status != GL_FRAMEBUFFER_COMPLETE)
     {
         LL_WARNS_ONCE("VR") << llformat("UI framebuffer incomplete: 0x%04X", status) << LL_ENDL;
+        if (index < sUITarget.images.size())
+        {
+            glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, 0);
+        }
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         xrOk(xrReleaseSwapchainImage(sUITarget.swapchain, nullptr), "xrReleaseSwapchainImage(UI)");
         return false;
@@ -780,13 +805,16 @@ bool LLVRBackend::beginUI(int width, int height)
     return true;
 }
 
-void LLVRBackend::endUI(const float centre[3], float width_m, float height_m)
+void LLVRBackend::endUI(const float centre[3], const float rot[4], float width_m, float height_m)
 {
     if (!sUIBegun)
     {
         return;
     }
     sUIBegun = false;
+    // The framebuffer object is shared with the eye copies, which have no use for the depth buffer.
+    glBindFramebuffer(GL_FRAMEBUFFER, sFBO); // the drawing in between may have gone back to the window's
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, 0);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     if (!xrOk(xrReleaseSwapchainImage(sUITarget.swapchain, nullptr), "xrReleaseSwapchainImage(UI)"))
     {
@@ -798,7 +826,7 @@ void LLVRBackend::endUI(const float centre[3], float width_m, float height_m)
     sUILayer.eyeVisibility = XR_EYE_VISIBILITY_BOTH;
     sUILayer.subImage.swapchain = sUITarget.swapchain;
     sUILayer.subImage.imageRect.extent = { sUITarget.width, sUITarget.height };
-    sUILayer.pose.orientation.w = 1.f;
+    sUILayer.pose.orientation = { rot[0], rot[1], rot[2], rot[3] };
     sUILayer.pose.position = { centre[0], centre[1], centre[2] };
     sUILayer.size = { width_m, height_m };
     sUIDone = true;

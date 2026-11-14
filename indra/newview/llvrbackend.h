@@ -30,6 +30,8 @@ struct LLVRInput
     bool trigger = false;         // right index trigger
     bool grip = false;            // right grip
     bool menu = false;            // left menu button
+    bool zoom = false;            // left index trigger
+    bool grab = false;            // left grip
     bool aim_valid = false;       // right hand is tracked; aim_pos/aim_rot are usable
     float aim_pos[3] = { 0.f, 0.f, 0.f };     // right-hand pointing pose in tracking space,
     float aim_rot[4] = { 0.f, 0.f, 0.f, 1.f }; // pointing along its -Z
@@ -62,10 +64,11 @@ public:
 
     // The flat UI as a panel in the headset. beginUI() binds a width x height RGBA image as
     // the GL framebuffer; draw into it (alpha = coverage, premultiplied), then call endUI()
-    // with the panel's centre in tracking space and its size in metres. It faces +Z.
+    // with the panel's centre and orientation (quaternion x, y, z, w; identity faces +Z) in
+    // tracking space and its size in metres. The image has a depth buffer.
     // endUI() rebinds the window's framebuffer. Only between beginFrame() and endFrame().
     bool beginUI(int width, int height);
-    void endUI(const float centre[3], float width_m, float height_m);
+    void endUI(const float centre[3], const float rot[4], float width_m, float height_m);
 
     // Hands the frame to the runtime. Safe to call when no frame was begun.
     void endFrame();

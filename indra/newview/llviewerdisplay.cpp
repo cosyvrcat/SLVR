@@ -1660,7 +1660,10 @@ void render_ui(F32 zoom_factor, int subfield)
         }
 // [/RLVa:KB]
         LLGLState::checkStates();
-        render_hud_attachments();
+        if (!gVR.rendersEye()) // SLVR: in VR the HUDs go on the UI panel, see LLViewerVR::drawPanel()
+        {
+            render_hud_attachments();
+        }
 
         LLGLState::checkStates();
 

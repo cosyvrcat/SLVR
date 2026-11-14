@@ -34,6 +34,7 @@
 #include "llagent.h" //  Get state values from here
 #include "llattachmentsmgr.h"
 #include "llagentcamera.h"
+#include "llviewerVR.h" // SLVR
 #include "llagentwearables.h"
 #include "llhudeffecttrail.h"
 #include "llhudmanager.h"
@@ -1471,6 +1472,10 @@ void LLVOAvatarSelf::restoreMeshData()
 //-----------------------------------------------------------------------------
 void LLVOAvatarSelf::updateAttachmentVisibility(U32 camera_mode)
 {
+    if (gVR.firstPerson()) // SLVR: seen from the avatar's eyes, hide what mouselook hides
+    {
+        camera_mode = CAMERA_MODE_MOUSELOOK;
+    }
     for (attachment_map_t::iterator iter = mAttachmentPoints.begin();
          iter != mAttachmentPoints.end();
          ++iter)
