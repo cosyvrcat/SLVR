@@ -22,6 +22,19 @@ struct LLVREye
     float tan_fov[4]; // tangents of the left, right, up, down half-angles (left and down are negative)
 };
 
+// Controller state for the frame being rendered (Touch layout: thumbstick x right, y forward).
+struct LLVRInput
+{
+    float move[2] = { 0.f, 0.f }; // left thumbstick
+    float turn[2] = { 0.f, 0.f }; // right thumbstick
+    bool trigger = false;         // right index trigger
+    bool grip = false;            // right grip
+    bool menu = false;            // left menu button
+    bool aim_valid = false;       // right hand is tracked; aim_pos/aim_rot are usable
+    float aim_pos[3] = { 0.f, 0.f, 0.f };     // right-hand pointing pose in tracking space,
+    float aim_rot[4] = { 0.f, 0.f, 0.f, 1.f }; // pointing along its -Z
+};
+
 class LLVRBackend
 {
 public:
@@ -40,8 +53,19 @@ public:
     // and fills both eyes when this frame should be rendered in stereo.
     bool beginFrame(LLVREye eyes[2]);
 
+    // Reads the controllers. Call once per frame after beginFrame() returned true. Returns
+    // false (input left untouched) when the controllers could not be set up or read.
+    bool getInput(LLVRInput& input);
+
     // Copies a rectangle of the window's back buffer into the image for one eye.
     bool submitEye(int eye, int x, int y, int width, int height);
+
+    // The flat UI as a panel in the headset. beginUI() binds a width x height RGBA image as
+    // the GL framebuffer; draw into it (alpha = coverage, premultiplied), then call endUI()
+    // with the panel's centre in tracking space and its size in metres. It faces +Z.
+    // endUI() rebinds the window's framebuffer. Only between beginFrame() and endFrame().
+    bool beginUI(int width, int height);
+    void endUI(const float centre[3], float width_m, float height_m);
 
     // Hands the frame to the runtime. Safe to call when no frame was begun.
     void endFrame();

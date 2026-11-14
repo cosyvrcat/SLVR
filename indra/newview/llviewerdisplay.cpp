@@ -1695,7 +1695,10 @@ void render_ui(F32 zoom_factor, int subfield)
         {
             LL_PROFILE_ZONE_NAMED_CATEGORY_UI("UI 2D"); //LL_RECORD_BLOCK_TIME(FTM_RENDER_UI_2D);
             LLHUDObject::renderAll();
-            render_ui_2d();
+            if (!gVR.rendersEye()) // SLVR: in VR the flat UI goes on a panel, see LLViewerVR::drawPanel()
+            {
+                render_ui_2d();
+            }
         }
         // <FS:Beq> FIRE-33239 - particles do not sie when UI is disabled
         if (!render_ui)

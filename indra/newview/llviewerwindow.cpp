@@ -173,6 +173,7 @@
 #include "llvieweraudio.h"
 #include "llviewergesture.h"
 #include "llviewertexturelist.h"
+#include "llviewerVR.h" // SLVR
 #include "llviewerinventory.h"
 #include "llviewermedia.h"
 #include "llviewermediafocus.h"
@@ -1722,6 +1723,17 @@ void LLViewerWindow::handleFocusLost(LLWindow *window)
 
 bool LLViewerWindow::handleTranslatedKeyDown(KEY key,  MASK mask, bool repeated)
 {
+    // SLVR: Ctrl+Alt+F7 toggles VR. Taken from the key event rather than polled once per
+    // frame: at VR frame rates a short tap begins and ends inside one frame and is missed.
+    if (key == KEY_F7 && mask == (MASK_CONTROL | MASK_ALT))
+    {
+        if (!repeated)
+        {
+            gSavedSettings.setBOOL("VREnabled", !gSavedSettings.getBOOL("VREnabled"));
+        }
+        return true;
+    }
+
     // Handle non-consuming global keybindings, like voice
     // Never affects event processing.
     gViewerInput.handleGlobalBindsKeyDown(key, mask);
@@ -5632,6 +5644,7 @@ LLViewerObject* LLViewerWindow::cursorIntersect(S32 mouse_x, S32 mouse_y, F32 de
 
     LLVector3 mouse_world_start = mouse_point_global;
     LLVector3 mouse_world_end   = mouse_point_global + mouse_direction_global * depth;
+    gVR.overridePickRay(mouse_world_start, mouse_world_end, depth); // SLVR: in VR, picks follow the controller's laser
 
     if (!LLViewerJoystick::getInstance()->getOverrideCamera() && !gPipeline.FSFocusPointFollowsPointer) // <FS:Beq> FIRE-16728 Add free aim mouse and focus lock
     { //always set raycast intersection to mouse_world_end unless

@@ -45,12 +45,29 @@ namespace
     XrSpace sSpace = XR_NULL_HANDLE;
     XrEnvironmentBlendMode sBlendMode = XR_ENVIRONMENT_BLEND_MODE_OPAQUE;
     EyeTarget sTargets[2];
+    EyeTarget sUITarget;      // the flat UI, shown as a quad layer; created on first use
+    int64_t sFormat = 0;
     GLuint sFBO = 0;
+
+    // Controllers. Left unset (sActionSet null) when setup failed: VR then runs without them.
+    XrActionSet sActionSet = XR_NULL_HANDLE;
+    XrAction sMoveAction = XR_NULL_HANDLE;
+    XrAction sTurnAction = XR_NULL_HANDLE;
+    XrAction sTriggerAction = XR_NULL_HANDLE;
+    XrAction sGripAction = XR_NULL_HANDLE;
+    XrAction sMenuAction = XR_NULL_HANDLE;
+    XrAction sAimAction = XR_NULL_HANDLE;
+    XrSpace sAimSpace = XR_NULL_HANDLE;
 
     bool sAlive = false;      // false after the runtime ends or loses the session
     bool sRunning = false;    // between xrBeginSession and xrEndSession
     bool sFrameBegun = false; // xrBeginFrame was called and xrEndFrame is owed
     bool sEyeDone[2] = { false, false };
+    bool sUIBegun = false;    // beginUI() left the UI image acquired and bound
+    bool sUIDone = false;     // sUILayer is filled in for this frame
+    XrCompositionLayerQuad sUILayer;
+    XrViewStateFlags sViewStateFlags = 0;
+    LLVRInput sLastInput;     // for the periodic log line
     XrTime sDisplayTime = 0;
     XrView sViews[2];
     XrCompositionLayerProjectionView sLayerViews[2];
@@ -103,6 +120,24 @@ namespace
         return (state >= 0 && state < (S32)LL_ARRAY_SIZE(NAMES)) ? NAMES[state] : "?";
     }
 
+    void logInteractionProfile(const char* hand)
+    {
+        XrPath hand_path = XR_NULL_PATH;
+        XrInteractionProfileState state{ XR_TYPE_INTERACTION_PROFILE_STATE };
+        if (!xrOk(xrStringToPath(sInstance, hand, &hand_path), "xrStringToPath(hand)")
+            || !xrOk(xrGetCurrentInteractionProfile(sSession, hand_path, &state), "xrGetCurrentInteractionProfile"))
+        {
+            return;
+        }
+        char name[XR_MAX_PATH_LENGTH] = "none";
+        uint32_t length = 0;
+        if (state.interactionProfile != XR_NULL_PATH)
+        {
+            xrOk(xrPathToString(sInstance, state.interactionProfile, sizeof(name), &length, name), "xrPathToString");
+        }
+        LL_INFOS("VR") << "Controller profile for " << hand << ": " << name << LL_ENDL;
+    }
+
     void pollEvents()
     {
         XrEventDataBuffer event{ XR_TYPE_EVENT_DATA_BUFFER };
@@ -131,6 +166,10 @@ namespace
                 }
                 break;
             }
+            case XR_TYPE_EVENT_DATA_INTERACTION_PROFILE_CHANGED:
+                logInteractionProfile("/user/hand/left");
+                logInteractionProfile("/user/hand/right");
+                break;
             case XR_TYPE_EVENT_DATA_INSTANCE_LOSS_PENDING:
                 LL_WARNS("VR") << "Runtime announced instance loss" << LL_ENDL;
                 sAlive = false;
@@ -160,14 +199,14 @@ namespace
         return offered.front();
     }
 
-    bool createEyeTarget(EyeTarget& target, const XrViewConfigurationView& view, int64_t format)
+    bool createTarget(EyeTarget& target, uint32_t width, uint32_t height)
     {
         XrSwapchainCreateInfo info{ XR_TYPE_SWAPCHAIN_CREATE_INFO };
         info.usageFlags = XR_SWAPCHAIN_USAGE_COLOR_ATTACHMENT_BIT | XR_SWAPCHAIN_USAGE_SAMPLED_BIT;
-        info.format = format;
+        info.format = sFormat;
         info.sampleCount = 1;
-        info.width = view.recommendedImageRectWidth;
-        info.height = view.recommendedImageRectHeight;
+        info.width = width;
+        info.height = height;
         info.faceCount = 1;
         info.arraySize = 1;
         info.mipCount = 1;
@@ -190,6 +229,98 @@ namespace
                     "xrEnumerateSwapchainImages");
     }
 
+    void destroyTarget(EyeTarget& target)
+    {
+        if (target.swapchain != XR_NULL_HANDLE)
+        {
+            xrOk(xrDestroySwapchain(target.swapchain), "xrDestroySwapchain");
+        }
+        target = EyeTarget();
+    }
+
+    bool createAction(XrAction& action, XrActionType type, const char* name, const char* description)
+    {
+        XrActionCreateInfo info{ XR_TYPE_ACTION_CREATE_INFO };
+        info.actionType = type;
+        snprintf(info.actionName, XR_MAX_ACTION_NAME_SIZE, "%s", name);
+        snprintf(info.localizedActionName, XR_MAX_LOCALIZED_ACTION_NAME_SIZE, "%s", description);
+        return xrOk(xrCreateAction(sActionSet, &info, &action), "xrCreateAction");
+    }
+
+    // Controller actions, bound to the Touch controller layout (what Quest headsets report,
+    // also through Virtual Desktop). Failure is not fatal: VR then runs without controllers.
+    // shortcut: Touch bindings only and the right hand points; add other interaction
+    // profiles and a handedness setting when another headset or a left-handed user needs them.
+    bool initInput()
+    {
+        XrActionSetCreateInfo set_info{ XR_TYPE_ACTION_SET_CREATE_INFO };
+        snprintf(set_info.actionSetName, XR_MAX_ACTION_SET_NAME_SIZE, "slvr");
+        snprintf(set_info.localizedActionSetName, XR_MAX_LOCALIZED_ACTION_SET_NAME_SIZE, "SLVR");
+        if (!xrOk(xrCreateActionSet(sInstance, &set_info, &sActionSet), "xrCreateActionSet"))
+        {
+            sActionSet = XR_NULL_HANDLE;
+            return false;
+        }
+
+        struct Binding { XrAction* action; XrActionType type; const char* name; const char* description; const char* path; };
+        const Binding BINDINGS[] = {
+            { &sMoveAction, XR_ACTION_TYPE_VECTOR2F_INPUT, "move", "Walk", "/user/hand/left/input/thumbstick" },
+            { &sTurnAction, XR_ACTION_TYPE_VECTOR2F_INPUT, "turn", "Turn", "/user/hand/right/input/thumbstick" },
+            { &sTriggerAction, XR_ACTION_TYPE_BOOLEAN_INPUT, "click", "Click", "/user/hand/right/input/trigger/value" },
+            { &sGripAction, XR_ACTION_TYPE_BOOLEAN_INPUT, "context", "Context menu", "/user/hand/right/input/squeeze/value" },
+            { &sMenuAction, XR_ACTION_TYPE_BOOLEAN_INPUT, "panel", "Show or hide the UI panel", "/user/hand/left/input/menu/click" },
+            { &sAimAction, XR_ACTION_TYPE_POSE_INPUT, "aim", "Pointer", "/user/hand/right/input/aim/pose" },
+        };
+        XrActionSuggestedBinding suggested[LL_ARRAY_SIZE(BINDINGS)];
+        for (size_t i = 0; i < LL_ARRAY_SIZE(BINDINGS); ++i)
+        {
+            const Binding& b = BINDINGS[i];
+            if (!createAction(*b.action, b.type, b.name, b.description)
+                || !xrOk(xrStringToPath(sInstance, b.path, &suggested[i].binding), "xrStringToPath(binding)"))
+            {
+                return false;
+            }
+            suggested[i].action = *b.action;
+        }
+
+        XrInteractionProfileSuggestedBinding profile{ XR_TYPE_INTERACTION_PROFILE_SUGGESTED_BINDING };
+        profile.countSuggestedBindings = (uint32_t)LL_ARRAY_SIZE(suggested);
+        profile.suggestedBindings = suggested;
+        if (!xrOk(xrStringToPath(sInstance, "/interaction_profiles/oculus/touch_controller", &profile.interactionProfile),
+                  "xrStringToPath(profile)")
+            || !xrOk(xrSuggestInteractionProfileBindings(sInstance, &profile), "xrSuggestInteractionProfileBindings"))
+        {
+            return false;
+        }
+
+        XrActionSpaceCreateInfo space_info{ XR_TYPE_ACTION_SPACE_CREATE_INFO };
+        space_info.action = sAimAction;
+        space_info.poseInActionSpace.orientation.w = 1.f;
+        XrSessionActionSetsAttachInfo attach_info{ XR_TYPE_SESSION_ACTION_SETS_ATTACH_INFO };
+        attach_info.countActionSets = 1;
+        attach_info.actionSets = &sActionSet;
+        return xrOk(xrCreateActionSpace(sSession, &space_info, &sAimSpace), "xrCreateActionSpace(aim)")
+            && xrOk(xrAttachSessionActionSets(sSession, &attach_info), "xrAttachSessionActionSets");
+    }
+
+    bool readBoolean(XrAction action, const char* call)
+    {
+        XrActionStateGetInfo info{ XR_TYPE_ACTION_STATE_GET_INFO };
+        info.action = action;
+        XrActionStateBoolean state{ XR_TYPE_ACTION_STATE_BOOLEAN };
+        return xrOk(xrGetActionStateBoolean(sSession, &info, &state), call) && state.isActive && state.currentState;
+    }
+
+    void readVector(XrAction action, const char* call, float out[2])
+    {
+        XrActionStateGetInfo info{ XR_TYPE_ACTION_STATE_GET_INFO };
+        info.action = action;
+        XrActionStateVector2f state{ XR_TYPE_ACTION_STATE_VECTOR2F };
+        const bool active = xrOk(xrGetActionStateVector2f(sSession, &info, &state), call) && state.isActive;
+        out[0] = active ? state.currentState.x : 0.f;
+        out[1] = active ? state.currentState.y : 0.f;
+    }
+
     void logStats()
     {
         const F32 seconds = std::chrono::duration<F32>(Clock::now() - sStatsStart).count();
@@ -207,6 +338,11 @@ namespace
                                    pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w,
                                    fov.angleLeft * RAD_TO_DEG, fov.angleRight * RAD_TO_DEG,
                                    fov.angleUp * RAD_TO_DEG, fov.angleDown * RAD_TO_DEG)
+                       // view flags: 1 orientation valid, 2 position valid, 4 orientation tracked, 8 position tracked
+                       << llformat("; view flags 0x%X; hand %s move (%.2f %.2f) turn (%.2f %.2f) trigger %d grip %d menu %d",
+                                   (U32)sViewStateFlags, sLastInput.aim_valid ? "tracked" : "not tracked",
+                                   sLastInput.move[0], sLastInput.move[1], sLastInput.turn[0], sLastInput.turn[1],
+                                   (S32)sLastInput.trigger, (S32)sLastInput.grip, (S32)sLastInput.menu)
                        << LL_ENDL;
         sStatsStart = Clock::now();
         sStatsFrames = sStatsStereoFrames = 0;
@@ -390,15 +526,15 @@ bool LLVRBackend::init(std::string& error)
     {
         return fail("Could not list the runtime's swapchain formats.");
     }
-    const int64_t format = chooseFormat(formats);
+    sFormat = chooseFormat(formats);
     std::string format_list;
     for (int64_t offered : formats)
     {
         format_list += llformat(" 0x%04X", (U32)offered);
     }
     LL_INFOS("VR") << "Swapchain formats offered:" << format_list
-                   << llformat("; using 0x%04X", (U32)format)
-                   << (format == GL_SRGB8_ALPHA8 ? " (GL_SRGB8_ALPHA8)" : format == GL_RGBA8 ? " (GL_RGBA8)" : "")
+                   << llformat("; using 0x%04X", (U32)sFormat)
+                   << (sFormat == GL_SRGB8_ALPHA8 ? " (GL_SRGB8_ALPHA8)" : sFormat == GL_RGBA8 ? " (GL_RGBA8)" : "")
                    << llformat("; blend mode %d", (S32)sBlendMode) << LL_ENDL;
 
     for (S32 eye = 0; eye < 2; ++eye)
@@ -407,7 +543,8 @@ bool LLVRBackend::init(std::string& error)
                        << config_views[eye].recommendedImageRectWidth << "x" << config_views[eye].recommendedImageRectHeight
                        << ", max " << config_views[eye].maxImageRectWidth << "x" << config_views[eye].maxImageRectHeight
                        << ", recommended samples " << config_views[eye].recommendedSwapchainSampleCount << LL_ENDL;
-        if (!createEyeTarget(sTargets[eye], config_views[eye], format))
+        if (!createTarget(sTargets[eye], config_views[eye].recommendedImageRectWidth,
+                          config_views[eye].recommendedImageRectHeight))
         {
             return fail("Could not create the eye images (swapchain).");
         }
@@ -415,6 +552,21 @@ bool LLVRBackend::init(std::string& error)
     }
 
     glGenFramebuffers(1, &sFBO);
+
+    if (initInput())
+    {
+        LL_INFOS("VR") << "Controller actions attached (Touch controller bindings)" << LL_ENDL;
+    }
+    else
+    {
+        LL_WARNS("VR") << "Controller setup failed; VR continues without controllers" << LL_ENDL;
+        if (sActionSet != XR_NULL_HANDLE)
+        {
+            xrOk(xrDestroyActionSet(sActionSet), "xrDestroyActionSet"); // also destroys its actions
+            sActionSet = XR_NULL_HANDLE;
+        }
+    }
+    sLastInput = LLVRInput();
 
     sStatsStart = Clock::now();
     sStatsFrames = sStatsStereoFrames = 0;
@@ -430,13 +582,24 @@ void LLVRBackend::shutdown()
         return;
     }
     // Children are destroyed with their parent, but destroy in order so failures are logged.
+    if (sUIBegun)
+    {
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    }
     for (EyeTarget& target : sTargets)
     {
-        if (target.swapchain != XR_NULL_HANDLE)
-        {
-            xrOk(xrDestroySwapchain(target.swapchain), "xrDestroySwapchain");
-        }
-        target = EyeTarget();
+        destroyTarget(target);
+    }
+    destroyTarget(sUITarget);
+    if (sAimSpace != XR_NULL_HANDLE)
+    {
+        xrOk(xrDestroySpace(sAimSpace), "xrDestroySpace(aim)");
+        sAimSpace = XR_NULL_HANDLE;
+    }
+    if (sActionSet != XR_NULL_HANDLE)
+    {
+        xrOk(xrDestroyActionSet(sActionSet), "xrDestroyActionSet"); // also destroys its actions
+        sActionSet = XR_NULL_HANDLE;
     }
     if (sFBO)
     {
@@ -456,7 +619,7 @@ void LLVRBackend::shutdown()
     xrDestroyInstance(sInstance);
     sInstance = XR_NULL_HANDLE;
     sSystemId = XR_NULL_SYSTEM_ID;
-    sAlive = sRunning = sFrameBegun = false;
+    sAlive = sRunning = sFrameBegun = sUIBegun = sUIDone = false;
     LL_INFOS("VR") << "OpenXR shut down" << LL_ENDL;
 }
 
@@ -490,6 +653,7 @@ bool LLVRBackend::beginFrame(LLVREye eyes[2])
     sFrameBegun = true;
     sDisplayTime = frame_state.predictedDisplayTime;
     sEyeDone[0] = sEyeDone[1] = false;
+    sUIDone = false;
     if (!frame_state.shouldRender)
     {
         return false; // endFrame() will submit no layers
@@ -507,6 +671,7 @@ bool LLVRBackend::beginFrame(LLVREye eyes[2])
     {
         return false;
     }
+    sViewStateFlags = view_state.viewStateFlags;
     const XrViewStateFlags needed = XR_VIEW_STATE_POSITION_VALID_BIT | XR_VIEW_STATE_ORIENTATION_VALID_BIT;
     if ((view_state.viewStateFlags & needed) != needed)
     {
@@ -523,6 +688,120 @@ bool LLVRBackend::beginFrame(LLVREye eyes[2])
                     { tanf(fov.angleLeft), tanf(fov.angleRight), tanf(fov.angleUp), tanf(fov.angleDown) } };
     }
     return true;
+}
+
+bool LLVRBackend::getInput(LLVRInput& input)
+{
+    if (!sFrameBegun || sActionSet == XR_NULL_HANDLE)
+    {
+        return false;
+    }
+    XrActiveActionSet active_set{ sActionSet, XR_NULL_PATH };
+    XrActionsSyncInfo sync_info{ XR_TYPE_ACTIONS_SYNC_INFO };
+    sync_info.countActiveActionSets = 1;
+    sync_info.activeActionSets = &active_set;
+    // XR_SESSION_NOT_FOCUSED is a success code: the actions then simply read as inactive.
+    if (!xrOk(xrSyncActions(sSession, &sync_info), "xrSyncActions"))
+    {
+        return false;
+    }
+
+    input = LLVRInput();
+    readVector(sMoveAction, "xrGetActionStateVector2f(move)", input.move);
+    readVector(sTurnAction, "xrGetActionStateVector2f(turn)", input.turn);
+    input.trigger = readBoolean(sTriggerAction, "xrGetActionStateBoolean(click)");
+    input.grip = readBoolean(sGripAction, "xrGetActionStateBoolean(context)");
+    input.menu = readBoolean(sMenuAction, "xrGetActionStateBoolean(panel)");
+
+    XrSpaceLocation location{ XR_TYPE_SPACE_LOCATION };
+    const XrSpaceLocationFlags needed = XR_SPACE_LOCATION_POSITION_VALID_BIT | XR_SPACE_LOCATION_ORIENTATION_VALID_BIT;
+    if (xrOk(xrLocateSpace(sAimSpace, sSpace, sDisplayTime, &location), "xrLocateSpace(aim)")
+        && (location.locationFlags & needed) == needed)
+    {
+        const XrPosef& pose = location.pose;
+        input.aim_valid = true;
+        input.aim_pos[0] = pose.position.x;
+        input.aim_pos[1] = pose.position.y;
+        input.aim_pos[2] = pose.position.z;
+        input.aim_rot[0] = pose.orientation.x;
+        input.aim_rot[1] = pose.orientation.y;
+        input.aim_rot[2] = pose.orientation.z;
+        input.aim_rot[3] = pose.orientation.w;
+    }
+    sLastInput = input;
+    return true;
+}
+
+bool LLVRBackend::beginUI(int width, int height)
+{
+    if (!sFrameBegun || sUIBegun || width <= 0 || height <= 0)
+    {
+        return false;
+    }
+    // The image is as large as the window so the UI is copied 1:1; recreate it on a resize.
+    if (sUITarget.width != width || sUITarget.height != height)
+    {
+        destroyTarget(sUITarget);
+        if (!createTarget(sUITarget, (uint32_t)width, (uint32_t)height))
+        {
+            destroyTarget(sUITarget);
+            return false;
+        }
+        LL_INFOS("VR") << "UI panel image: " << width << "x" << height << ", "
+                       << sUITarget.images.size() << " images" << LL_ENDL;
+    }
+
+    uint32_t index = 0;
+    if (!xrOk(xrAcquireSwapchainImage(sUITarget.swapchain, nullptr, &index), "xrAcquireSwapchainImage(UI)"))
+    {
+        return false;
+    }
+    XrSwapchainImageWaitInfo wait_info{ XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO };
+    wait_info.timeout = XR_INFINITE_DURATION;
+    if (!xrOk(xrWaitSwapchainImage(sUITarget.swapchain, &wait_info), "xrWaitSwapchainImage(UI)"))
+    {
+        return false; // nothing to release: the spec only allows a release after a successful wait
+    }
+    GLenum status = GL_FRAMEBUFFER_UNSUPPORTED;
+    if (index < sUITarget.images.size())
+    {
+        glBindFramebuffer(GL_FRAMEBUFFER, sFBO);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, sUITarget.images[index].image, 0);
+        status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
+    }
+    if (status != GL_FRAMEBUFFER_COMPLETE)
+    {
+        LL_WARNS_ONCE("VR") << llformat("UI framebuffer incomplete: 0x%04X", status) << LL_ENDL;
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        xrOk(xrReleaseSwapchainImage(sUITarget.swapchain, nullptr), "xrReleaseSwapchainImage(UI)");
+        return false;
+    }
+    sUIBegun = true;
+    return true;
+}
+
+void LLVRBackend::endUI(const float centre[3], float width_m, float height_m)
+{
+    if (!sUIBegun)
+    {
+        return;
+    }
+    sUIBegun = false;
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    if (!xrOk(xrReleaseSwapchainImage(sUITarget.swapchain, nullptr), "xrReleaseSwapchainImage(UI)"))
+    {
+        return;
+    }
+    sUILayer = { XR_TYPE_COMPOSITION_LAYER_QUAD };
+    sUILayer.layerFlags = XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT; // colour is premultiplied
+    sUILayer.space = sSpace;
+    sUILayer.eyeVisibility = XR_EYE_VISIBILITY_BOTH;
+    sUILayer.subImage.swapchain = sUITarget.swapchain;
+    sUILayer.subImage.imageRect.extent = { sUITarget.width, sUITarget.height };
+    sUILayer.pose.orientation.w = 1.f;
+    sUILayer.pose.position = { centre[0], centre[1], centre[2] };
+    sUILayer.size = { width_m, height_m };
+    sUIDone = true;
 }
 
 bool LLVRBackend::submitEye(int eye, int x, int y, int width, int height)
@@ -600,15 +879,33 @@ void LLVRBackend::endFrame()
     layer.space = sSpace;
     layer.viewCount = 2;
     layer.views = sLayerViews;
-    const XrCompositionLayerBaseHeader* const layers[] = { reinterpret_cast<XrCompositionLayerBaseHeader*>(&layer) };
+
+    if (sUIBegun)
+    {
+        // The caller never reached endUI(); give the image back so the swapchain is not left acquired.
+        sUIBegun = false;
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        xrOk(xrReleaseSwapchainImage(sUITarget.swapchain, nullptr), "xrReleaseSwapchainImage(UI, abandoned)");
+    }
 
     // Without both eyes (runtime said not to render, or a copy failed) submit an empty frame.
+    // The UI panel is drawn over the scene, so it only goes out together with the scene.
     const bool stereo = sEyeDone[0] && sEyeDone[1];
+    const XrCompositionLayerBaseHeader* layers[2];
+    uint32_t layer_count = 0;
+    if (stereo)
+    {
+        layers[layer_count++] = reinterpret_cast<XrCompositionLayerBaseHeader*>(&layer);
+        if (sUIDone)
+        {
+            layers[layer_count++] = reinterpret_cast<XrCompositionLayerBaseHeader*>(&sUILayer);
+        }
+    }
     XrFrameEndInfo end_info{ XR_TYPE_FRAME_END_INFO };
     end_info.displayTime = sDisplayTime;
     end_info.environmentBlendMode = sBlendMode;
-    end_info.layerCount = stereo ? 1 : 0;
-    end_info.layers = stereo ? layers : nullptr;
+    end_info.layerCount = layer_count;
+    end_info.layers = layer_count ? layers : nullptr;
     xrOk(xrEndFrame(sSession, &end_info), "xrEndFrame");
 
     ++sStatsFrames;
