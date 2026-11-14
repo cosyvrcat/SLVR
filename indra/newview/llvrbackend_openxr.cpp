@@ -14,6 +14,7 @@
 #include "llgl.h"
 #include "llviewercontrol.h"
 #include "llwin32headers.h"
+#include <unknwn.h> // IUnknown: openxr_platform.h needs it and the lean Windows headers leave it out
 
 #define XR_USE_PLATFORM_WIN32
 #define XR_USE_GRAPHICS_API_OPENGL
