@@ -272,7 +272,11 @@ void LLViewerVR::beginEye()
                 mBaseOrigin = gAgentAvatarp->getRenderPosition() + head * gAgentAvatarp->getRenderRotation();
             }
             const LLVector3 at = LLVector3::x_axis * heading;
-            yaw = atan2f(at.mV[VY], at.mV[VX]);
+            if (gAgentAvatarp->isSitting())
+            {
+                mYawOffset = 0.f;
+            }
+            yaw = atan2f(at.mV[VY], at.mV[VX]) + mYawOffset;
             mBaseAt.set(cosf(yaw), sinf(yaw), 0.f);
             mBaseLeft.set(-sinf(yaw), cosf(yaw), 0.f);
             mBaseUp = LLVector3::z_axis;
@@ -489,8 +493,20 @@ void LLViewerVR::drawPanel()
 
     // HUD attachments belong to the flat screen like the UI does: render_ui() leaves them
     // out of the eye images, where they ended up at the edge of the field of view.
+    GLint target = 0, after = 0;
+    glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &target);
     gViewerWindow->setup3DRender();
     render_hud_attachments();
+    glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &after);
+    if (after != target)
+    {
+        // A pass that went through an LLRenderTarget ends on the window's framebuffer; that
+        // left the panel empty in v0.3.0. Keep at least the UI on the panel.
+        LL_WARNS_ONCE("VR") << "HUD pass left framebuffer " << after << " bound instead of " << target << LL_ENDL;
+        glBindFramebuffer(GL_FRAMEBUFFER, target);
+        glDrawBuffer(GL_COLOR_ATTACHMENT0); // LLRenderTarget::flush() selected GL_BACK
+        glReadBuffer(GL_COLOR_ATTACHMENT0);
+    }
 
     LLGLSUIDefault gls_ui;
     gViewerWindow->setup2DRender();
@@ -666,6 +682,22 @@ void LLViewerVR::applyInput()
     // Left stick walks and strafes, like the arrow keys. Walking brings a zoomed camera
     // back to the avatar.
     const bool walk = fabsf(input.move[1]) > STICK_ON, strafe = fabsf(input.move[0]) > STICK_ON;
+    if ((walk || strafe) && mFirstPerson && isAgentAvatarValid() && !gAgentAvatarp->isSitting())
+    {
+        // Forward is where the head looks, not where the avatar happened to face: turn the
+        // avatar there, and the tracking space back by as much so that the view stays put.
+        const float forward[3] = { 0.f, 0.f, -1.f };
+        float rotated[3];
+        rotate(mEyes[0].rot, forward, rotated);
+        LLVector3 look = toAgent(trackingToLocal(rotated));
+        look.mV[VZ] = 0.f;
+        if (look.normalize() > 0.3f) // looking straight up or down gives no heading
+        {
+            const F32 base = atan2f(mBaseYawSin, mBaseYawCos);
+            gAgent.resetAxes(look);
+            mYawOffset = base - atan2f(look.mV[VY], look.mV[VX]);
+        }
+    }
     if (walk)
     {
         gAgent.moveAt(input.move[1] > 0.f ? 1 : -1, false);

@@ -104,6 +104,7 @@ private:
     // Viewer camera as the agent camera left it this frame: the VR tracking origin.
     LLVector3 mBaseOrigin, mBaseAt, mBaseLeft, mBaseUp;
     F32 mBaseYawCos = 1.f, mBaseYawSin = 0.f;
+    F32 mYawOffset = 0.f; // tracking space heading relative to the avatar's, see applyInput()
 };
 
 extern LLViewerVR gVR;
