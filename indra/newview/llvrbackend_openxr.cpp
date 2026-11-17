@@ -61,6 +61,8 @@ namespace
     GLuint sUIDepth = 0;      // depth buffer for the UI image (HUD attachments need one)
     XrAction sAimAction = XR_NULL_HANDLE;
     XrSpace sAimSpace = XR_NULL_HANDLE;
+    XrAction sLeftAimAction = XR_NULL_HANDLE;
+    XrSpace sLeftAimSpace = XR_NULL_HANDLE;
 
     bool sAlive = false;      // false after the runtime ends or loses the session
     bool sRunning = false;    // between xrBeginSession and xrEndSession
@@ -252,7 +254,8 @@ namespace
 
     // Controller actions, bound to the Touch controller layout (what Quest headsets report,
     // also through Virtual Desktop). Failure is not fatal: VR then runs without controllers.
-    // shortcut: Touch bindings only and the right hand points; add other interaction
+    // shortcut: Touch bindings only and the right hand points (the left one only at the
+    // on-screen keyboard); add other interaction
     // profiles and a handedness setting when another headset or a left-handed user needs them.
     bool initInput()
     {
@@ -275,6 +278,7 @@ namespace
             { &sZoomAction, XR_ACTION_TYPE_BOOLEAN_INPUT, "zoom", "Zoom the camera to a point", "/user/hand/left/input/trigger/value" },
             { &sGrabAction, XR_ACTION_TYPE_BOOLEAN_INPUT, "grab", "Move the UI panel", "/user/hand/left/input/squeeze/value" },
             { &sAimAction, XR_ACTION_TYPE_POSE_INPUT, "aim", "Pointer", "/user/hand/right/input/aim/pose" },
+            { &sLeftAimAction, XR_ACTION_TYPE_POSE_INPUT, "aim_left", "Left pointer (on-screen keyboard)", "/user/hand/left/input/aim/pose" },
         };
         XrActionSuggestedBinding suggested[LL_ARRAY_SIZE(BINDINGS)];
         for (size_t i = 0; i < LL_ARRAY_SIZE(BINDINGS); ++i)
@@ -301,11 +305,34 @@ namespace
         XrActionSpaceCreateInfo space_info{ XR_TYPE_ACTION_SPACE_CREATE_INFO };
         space_info.action = sAimAction;
         space_info.poseInActionSpace.orientation.w = 1.f;
+        XrActionSpaceCreateInfo left_space_info = space_info;
+        left_space_info.action = sLeftAimAction;
         XrSessionActionSetsAttachInfo attach_info{ XR_TYPE_SESSION_ACTION_SETS_ATTACH_INFO };
         attach_info.countActionSets = 1;
         attach_info.actionSets = &sActionSet;
         return xrOk(xrCreateActionSpace(sSession, &space_info, &sAimSpace), "xrCreateActionSpace(aim)")
+            && xrOk(xrCreateActionSpace(sSession, &left_space_info, &sLeftAimSpace), "xrCreateActionSpace(aim_left)")
             && xrOk(xrAttachSessionActionSets(sSession, &attach_info), "xrAttachSessionActionSets");
+    }
+
+    // Where a hand points, in tracking space; false when it is not tracked.
+    bool locateAim(XrSpace space, const char* call, float pos[3], float rot[4])
+    {
+        XrSpaceLocation location{ XR_TYPE_SPACE_LOCATION };
+        const XrSpaceLocationFlags needed = XR_SPACE_LOCATION_POSITION_VALID_BIT | XR_SPACE_LOCATION_ORIENTATION_VALID_BIT;
+        if (!xrOk(xrLocateSpace(space, sSpace, sDisplayTime, &location), call) || (location.locationFlags & needed) != needed)
+        {
+            return false;
+        }
+        const XrPosef& pose = location.pose;
+        pos[0] = pose.position.x;
+        pos[1] = pose.position.y;
+        pos[2] = pose.position.z;
+        rot[0] = pose.orientation.x;
+        rot[1] = pose.orientation.y;
+        rot[2] = pose.orientation.z;
+        rot[3] = pose.orientation.w;
+        return true;
     }
 
     bool readBoolean(XrAction action, const char* call)
@@ -607,6 +634,11 @@ void LLVRBackend::shutdown()
         xrOk(xrDestroySpace(sAimSpace), "xrDestroySpace(aim)");
         sAimSpace = XR_NULL_HANDLE;
     }
+    if (sLeftAimSpace != XR_NULL_HANDLE)
+    {
+        xrOk(xrDestroySpace(sLeftAimSpace), "xrDestroySpace(aim_left)");
+        sLeftAimSpace = XR_NULL_HANDLE;
+    }
     if (sActionSet != XR_NULL_HANDLE)
     {
         xrOk(xrDestroyActionSet(sActionSet), "xrDestroyActionSet"); // also destroys its actions
@@ -726,21 +758,8 @@ bool LLVRBackend::getInput(LLVRInput& input)
     input.zoom = readBoolean(sZoomAction, "xrGetActionStateBoolean(zoom)");
     input.grab = readBoolean(sGrabAction, "xrGetActionStateBoolean(grab)");
 
-    XrSpaceLocation location{ XR_TYPE_SPACE_LOCATION };
-    const XrSpaceLocationFlags needed = XR_SPACE_LOCATION_POSITION_VALID_BIT | XR_SPACE_LOCATION_ORIENTATION_VALID_BIT;
-    if (xrOk(xrLocateSpace(sAimSpace, sSpace, sDisplayTime, &location), "xrLocateSpace(aim)")
-        && (location.locationFlags & needed) == needed)
-    {
-        const XrPosef& pose = location.pose;
-        input.aim_valid = true;
-        input.aim_pos[0] = pose.position.x;
-        input.aim_pos[1] = pose.position.y;
-        input.aim_pos[2] = pose.position.z;
-        input.aim_rot[0] = pose.orientation.x;
-        input.aim_rot[1] = pose.orientation.y;
-        input.aim_rot[2] = pose.orientation.z;
-        input.aim_rot[3] = pose.orientation.w;
-    }
+    input.aim_valid = locateAim(sAimSpace, "xrLocateSpace(aim)", input.aim_pos, input.aim_rot);
+    input.left_aim_valid = locateAim(sLeftAimSpace, "xrLocateSpace(aim_left)", input.left_aim_pos, input.left_aim_rot);
     sLastInput = input;
     return true;
 }

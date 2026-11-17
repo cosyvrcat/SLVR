@@ -36,6 +36,7 @@
 #include "pipeline.h"
 
 extern bool gCubeSnapshot;
+extern bool gGLCoverageAlpha; // llrender.cpp
 void render_hud_attachments(); // llviewerdisplay.cpp
 
 LLViewerVR gVR;
@@ -134,6 +135,19 @@ namespace
     const F32 ZOOM_RATE = 1.5f;      // zoom e-foldings, and orbit radians, per second at full stick
     const F32 DOUBLE_CLICK_TIME = 0.5f; // seconds
     const S32 DOUBLE_CLICK_SLOP = 40;   // pixels the laser may wander between the two clicks
+    const F32 ZOOM_RETARGET = 0.1f;     // metres the laser's hit moves before the zoom focus follows it
+
+    // Laser steadying, see LLViewerVR::steady(): cutoff frequencies in Hz, and how much a
+    // swing of one radian per second raises the cutoff.
+    const F32 STEADY_MIN_CUTOFF = 1.f;
+    const F32 STEADY_BETA = 2.f; // 0.5 degree tremor at 30 fps comes out 0.08; a 30 degree swing settles in 4 frames
+    const F32 STEADY_SPEED_CUTOFF = 1.f;
+
+    // Share of the way a first-order low-pass filter moves towards its input in dt seconds.
+    F32 lowPass(F32 cutoff, F32 dt)
+    {
+        return 1.f - expf(-dt * F_TWO_PI * cutoff);
+    }
 
     // Self-check of the two conversions above; cheap, runs once when VR is switched on.
     void checkConventions()
@@ -176,6 +190,7 @@ void LLViewerVR::updateEnabled()
     {
         LL_INFOS("VR") << "VR enabled, starting OpenXR" << LL_ENDL;
         checkConventions();
+        checkSteady();
         std::string error;
         if (!mBackend.init(error))
         {
@@ -203,7 +218,8 @@ void LLViewerVR::shutdown()
     mSecondPass = false;
     const bool was_running = mBackend.isInitialized();
     mBackend.shutdown();
-    mLaserValid = mPanelHit = mWorldHit = mFirstPerson = false;
+    mLaserValid = mPanelHit = mWorldHit = mFirstPerson = mLeftLaserValid = mLeftPanelHit = false;
+    mSteady.valid = mLeftSteady.valid = false;
     if (was_running && gViewerWindow)
     {
         gViewerWindow->getWindow()->toggleVSync(gSavedSettings.getBOOL("RenderVSyncEnable"));
@@ -218,7 +234,7 @@ void LLViewerVR::beginEye()
     if (!mSecondPass)
     {
         mEye = -1;
-        mLaserValid = mPanelHit = mWorldHit = mFirstPerson = false;
+        mLaserValid = mPanelHit = mWorldHit = mFirstPerson = mLeftLaserValid = mLeftPanelHit = false;
         updateEnabled();
         if (!mBackend.isInitialized() || !mBackend.beginFrame(mEyes))
         {
@@ -243,6 +259,7 @@ void LLViewerVR::beginEye()
             && isAgentAvatarValid() && gAgentAvatarp->mDrawable.notNull())
         {
             mFirstPerson = true;
+            mZoomYawOffset = 0.f;
             LLQuaternion heading = gAgent.getFrameAgent().getQuaternion();
             LLVector3 head(0.f, 0.f, gAgentAvatarp->mHeadOffset.mV[VZ]);
             if (gAgentAvatarp->isSitting())
@@ -280,6 +297,10 @@ void LLViewerVR::beginEye()
             mBaseAt.set(cosf(yaw), sinf(yaw), 0.f);
             mBaseLeft.set(-sinf(yaw), cosf(yaw), 0.f);
             mBaseUp = LLVector3::z_axis;
+        }
+        else
+        {
+            yaw += mZoomYawOffset;
         }
         mBaseYawCos = cosf(yaw);
         mBaseYawSin = sinf(yaw);
@@ -334,7 +355,11 @@ bool LLViewerVR::endEye()
 
     if (mLaserValid)
     {
-        drawLaser();
+        drawLaser(mLaserStart, mLaserDir, mLaserLength);
+    }
+    if (mLeftLaserValid)
+    {
+        drawLaser(mLeftLaserStart, mLeftLaserDir, mLeftLaserLength);
     }
     const LLRect view = gViewerWindow->getWorldViewRectRaw();
     mBackend.submitEye(mEye, view.mLeft, view.mBottom, view.getWidth(), view.getHeight());
@@ -372,15 +397,16 @@ const F32* LLViewerVR::eyeTanFov() const
 // While the left grip is held the panel is carried along on the laser instead.
 void LLViewerVR::updatePointer()
 {
+    updateLeftPointer();
     if (!mInput.aim_valid)
     {
         mGrabbing = false;
+        mSteady.valid = false;
         return;
     }
-    const float forward[3] = { 0.f, 0.f, -1.f };
-    float dir[3];
-    rotate(mInput.aim_rot, forward, dir);
-    const float* pos = mInput.aim_pos;
+    steady(mSteady, mInput.aim_pos, mInput.aim_rot, (F32)gFrameIntervalSeconds);
+    const float* dir = mSteady.dir;
+    const float* pos = mSteady.pos;
 
     mLaserValid = true;
     mLaserStart = mBaseOrigin + toAgent(trackingToLocal(pos));
@@ -409,30 +435,10 @@ void LLViewerVR::updatePointer()
     }
     mGrabbing = false;
 
-    // Into the panel's own frame (x right, y up, z out of its face): it lies in z = 0.
-    const LLRect window = gViewerWindow->getWindowRectRaw();
-    if (mPanelVisible && window.getWidth() > 0 && window.getHeight() > 0)
+    if (hitPanel(pos, dir, mPointerX, mPointerY, mLaserLength))
     {
-        const float inverse[4] = { -mPanelRot[0], -mPanelRot[1], -mPanelRot[2], mPanelRot[3] };
-        const float offset[3] = { pos[0] - mPanelCentre[0], pos[1] - mPanelCentre[1], pos[2] - mPanelCentre[2] };
-        float local_pos[3], local_dir[3];
-        rotate(inverse, offset, local_pos);
-        rotate(inverse, dir, local_dir);
-        if (local_dir[2] < -0.01f)
-        {
-            const F32 distance = -local_pos[2] / local_dir[2];
-            const F32 panel_height = mPanelWidth * window.getHeight() / window.getWidth();
-            const F32 u = (local_pos[0] + distance * local_dir[0]) / mPanelWidth + 0.5f;
-            const F32 v = (local_pos[1] + distance * local_dir[1]) / panel_height + 0.5f;
-            if (distance > 0.f && u >= 0.f && u < 1.f && v >= 0.f && v < 1.f)
-            {
-                mPanelHit = true;
-                mPointerX = llfloor(u * window.getWidth());
-                mPointerY = llfloor(v * window.getHeight());
-                mLaserLength = distance;
-                return;
-            }
-        }
+        mPanelHit = true;
+        return;
     }
 
     LLVector4a start, end, hit;
@@ -447,6 +453,126 @@ void LLViewerVR::updatePointer()
     }
 }
 
+// The left hand points only while the on-screen keyboard is up (shown last frame), so that
+// both hands can type; the rest of the time its trigger and grip have other jobs.
+void LLViewerVR::updateLeftPointer()
+{
+    if (!mInput.left_aim_valid || !mKeyboardShown)
+    {
+        mLeftSteady.valid = false;
+        return;
+    }
+    steady(mLeftSteady, mInput.left_aim_pos, mInput.left_aim_rot, (F32)gFrameIntervalSeconds);
+    mLeftLaserValid = true;
+    mLeftLaserStart = mBaseOrigin + toAgent(trackingToLocal(mLeftSteady.pos));
+    mLeftLaserDir = toAgent(trackingToLocal(mLeftSteady.dir));
+    mLeftLaserLength = LASER_LENGTH;
+    mLeftPanelHit = hitPanel(mLeftSteady.pos, mLeftSteady.dir, mLeftPointerX, mLeftPointerY, mLeftLaserLength);
+}
+
+// Where a ray (tracking space) meets the UI panel: window pixels, origin bottom left, and
+// the distance along the ray. Leaves the outputs alone when it misses.
+bool LLViewerVR::hitPanel(const float pos[3], const float dir[3], S32& x, S32& y, F32& distance) const
+{
+    // Into the panel's own frame (x right, y up, z out of its face): it lies in z = 0.
+    const LLRect window = gViewerWindow->getWindowRectRaw();
+    if (!mPanelVisible || window.getWidth() <= 0 || window.getHeight() <= 0)
+    {
+        return false;
+    }
+    const float inverse[4] = { -mPanelRot[0], -mPanelRot[1], -mPanelRot[2], mPanelRot[3] };
+    const float offset[3] = { pos[0] - mPanelCentre[0], pos[1] - mPanelCentre[1], pos[2] - mPanelCentre[2] };
+    float local_pos[3], local_dir[3];
+    rotate(inverse, offset, local_pos);
+    rotate(inverse, dir, local_dir);
+    if (local_dir[2] >= -0.01f)
+    {
+        return false;
+    }
+    const F32 along = -local_pos[2] / local_dir[2];
+    const F32 panel_height = mPanelWidth * window.getHeight() / window.getWidth();
+    const F32 u = (local_pos[0] + along * local_dir[0]) / mPanelWidth + 0.5f;
+    const F32 v = (local_pos[1] + along * local_dir[1]) / panel_height + 0.5f;
+    if (along <= 0.f || u < 0.f || u >= 1.f || v < 0.f || v >= 1.f)
+    {
+        return false;
+    }
+    x = llfloor(u * window.getWidth());
+    y = llfloor(v * window.getHeight());
+    distance = along;
+    return true;
+}
+
+// Steadies a hand's pointing pose against tremor, which made the laser land on neighbouring
+// keys: an adaptive low-pass (the 1-euro filter) that follows slowly while the hand is
+// nearly still and at once when it swings.
+void LLViewerVR::steady(SteadyPose& s, const float pos[3], const float rot[4], F32 dt)
+{
+    const float forward[3] = { 0.f, 0.f, -1.f };
+    float dir[3];
+    rotate(rot, forward, dir);
+    if (!s.valid)
+    {
+        s.valid = true;
+        s.speed = 0.f;
+        std::copy(pos, pos + 3, s.pos);
+        std::copy(dir, dir + 3, s.dir);
+        return;
+    }
+    dt = llclamp(dt, 0.001f, 0.1f);
+    const F32 cosine = llclamp(dir[0] * s.dir[0] + dir[1] * s.dir[1] + dir[2] * s.dir[2], -1.f, 1.f);
+    s.speed += (acosf(cosine) / dt - s.speed) * lowPass(STEADY_SPEED_CUTOFF, dt); // radians per second
+    const F32 share = lowPass(STEADY_MIN_CUTOFF + STEADY_BETA * s.speed, dt);
+    F32 length = 0.f;
+    for (S32 i = 0; i < 3; ++i)
+    {
+        s.pos[i] += (pos[i] - s.pos[i]) * share;
+        s.dir[i] += (dir[i] - s.dir[i]) * share;
+        length += s.dir[i] * s.dir[i];
+    }
+    length = sqrtf(length);
+    for (S32 i = 0; i < 3; ++i)
+    {
+        s.dir[i] = length > 0.01f ? s.dir[i] / length : dir[i]; // short only if the hand turned right round in a frame
+    }
+}
+
+// Self-check of steady(), the figures quoted at STEADY_BETA: runs once when VR is switched on.
+void LLViewerVR::checkSteady()
+{
+    const float pos[3] = { 0.f, 0.f, 0.f };
+    auto yawed = [](F32 degrees, float q[4]) // about +Y
+    {
+        const F32 half = degrees * DEG_TO_RAD / 2.f;
+        q[0] = q[2] = 0.f;
+        q[1] = sinf(half);
+        q[3] = cosf(half);
+    };
+    auto off = [](const SteadyPose& s, F32 degrees) // how far the steadied laser is from that heading
+    {
+        return fabsf(atan2f(-s.dir[0], -s.dir[2]) * RAD_TO_DEG - degrees);
+    };
+    SteadyPose s;
+    float q[4];
+    F32 tremor = 0.f;
+    for (S32 frame = 0; frame < 70; ++frame)
+    {
+        yawed(frame % 2 ? 0.5f : -0.5f, q);
+        steady(s, pos, q, 1.f / 30.f);
+        if (frame >= 60)
+        {
+            tremor = llmax(tremor, off(s, 0.f));
+        }
+    }
+    llassert_always(tremor < 0.12f);
+    yawed(30.f, q);
+    for (S32 frame = 0; frame < 10; ++frame)
+    {
+        steady(s, pos, q, 1.f / 30.f);
+    }
+    llassert_always(off(s, 30.f) < 0.1f);
+}
+
 void LLViewerVR::overridePickRay(LLVector3& start, LLVector3& end, F32 depth) const
 {
     // Also while it points at the panel: a click on an empty part of the panel falls
@@ -459,7 +585,7 @@ void LLViewerVR::overridePickRay(LLVector3& start, LLVector3& end, F32 depth) co
 }
 
 // Draws the laser into the eye that has just been rendered, over everything else.
-void LLViewerVR::drawLaser()
+void LLViewerVR::drawLaser(const LLVector3& start, const LLVector3& dir, F32 length)
 {
     gViewerWindow->setup3DRender(); // this eye's matrices; render_ui() left its own behind
     LLGLSUIDefault gls_ui;
@@ -467,8 +593,8 @@ void LLViewerVR::drawLaser()
     gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
     gGL.begin(LLRender::LINES);
     gGL.color3f(1.f, 0.25f, 0.2f);
-    gGL.vertex3fv(mLaserStart.mV);
-    gGL.vertex3fv((mLaserStart + mLaserDir * mLaserLength).mV);
+    gGL.vertex3fv(start.mV);
+    gGL.vertex3fv((start + dir * length).mV);
     gGL.end();
     gGL.flush();
     gUIProgram.unbind();
@@ -514,7 +640,7 @@ void LLViewerVR::drawPanel()
         // The HUD shaders do not write coverage to alpha. Make every pixel they drew opaque:
         // those are the ones nearer than the cleared depth.
         // shortcut: see-through HUD faces (they write no depth) keep whatever alpha their
-        // shader wrote; fix together with the UI's alpha below.
+        // shader wrote; fix when a HUD that relies on them is unreadable.
         LLGLDepthTest depth(GL_TRUE, GL_FALSE, GL_GREATER);
         glDepthRange(1.0, 1.0);
         gGL.setColorMask(false, true);
@@ -528,8 +654,10 @@ void LLViewerVR::drawPanel()
 
     // Not render_ui_2d(): with RenderUIBuffer on it draws through a render target and then
     // returns to the window's framebuffer, leaving the panel image empty.
-    // shortcut: translucent UI comes out too transparent (blending squares its alpha on
-    // an empty target); needs a separate alpha blend factor the UI code does not reset.
+    // Ordinary blending squares alpha on an empty target, which left translucent UI (pie
+    // menus) nearly invisible; gGLCoverageAlpha accumulates it as coverage instead.
+    gGLCoverageAlpha = true;
+    gGL.blendFunc(LLRender::BF_SOURCE_ALPHA, LLRender::BF_ONE_MINUS_SOURCE_ALPHA);
     gViewerWindow->draw();
 
     // The UI leaves a plain window-pixel coordinate system behind.
@@ -561,7 +689,8 @@ void LLViewerVR::drawPanel()
                     }
                 }
                 const S32 left = mKeyboardLeft + column * size, top = mKeyboardTop - row * size;
-                const bool hover = row == mHoverRow && mHoverColumn >= column && mHoverColumn < column + columns;
+                const bool hover = (row == mHoverRow && mHoverColumn >= column && mHoverColumn < column + columns)
+                    || (row == mLeftHoverRow && mLeftHoverColumn >= column && mLeftHoverColumn < column + columns);
                 const bool lit = hover || (code == OSK_SHIFT && mShift);
                 gl_rect_2d(left + gap, top - gap, left + columns * size - gap, top - size + gap,
                            lit ? LLColor4(0.2f, 0.45f, 0.8f, 1.f) : LLColor4(0.22f, 0.22f, 0.26f, 1.f));
@@ -575,14 +704,19 @@ void LLViewerVR::drawPanel()
             }
         }
     }
-    if (mPanelHit)
+    // The mouse cursor is not part of the UI image; mark where the lasers land.
+    for (S32 hand = 0; hand < 2; ++hand)
     {
-        // The mouse cursor is not part of the UI image; mark where the laser lands.
-        const S32 x = mPointerX, y = mPointerY;
-        gl_rect_2d(x - 5, y + 5, x + 5, y - 5, LLColor4::black);
-        gl_rect_2d(x - 3, y + 3, x + 3, y - 3, LLColor4::white);
+        if (hand ? mLeftPanelHit : mPanelHit)
+        {
+            const S32 x = hand ? mLeftPointerX : mPointerX, y = hand ? mLeftPointerY : mPointerY;
+            gl_rect_2d(x - 5, y + 5, x + 5, y - 5, LLColor4::black);
+            gl_rect_2d(x - 3, y + 3, x + 3, y - 3, LLColor4::white);
+        }
     }
     gGL.flush();
+    gGLCoverageAlpha = false;
+    gGL.blendFunc(LLRender::BF_SOURCE_ALPHA, LLRender::BF_ONE_MINUS_SOURCE_ALPHA);
     gUIProgram.unbind();
     gGL.setColorMask(true, false);
 
@@ -602,7 +736,7 @@ void LLViewerVR::updateKeyboard()
     const LLRect window = gViewerWindow->getWindowRectRaw();
     mKeySize = llmin(window.getHeight() / 14, window.getWidth() / KEY_COLUMNS);
     mKeyboardShown = mPanelVisible && focus && focus->acceptsTextInput() && mKeySize >= 8;
-    mHoverColumn = mHoverRow = -1;
+    mHoverColumn = mHoverRow = mLeftHoverColumn = mLeftHoverRow = -1;
     if (!mKeyboardShown)
     {
         return;
@@ -612,11 +746,24 @@ void LLViewerVR::updateKeyboard()
     mKeyboardLeft = (window.getWidth() - KEY_COLUMNS * mKeySize) / 2;
     mKeyboardTop = focus_y < window.getHeight() / 2 ? window.getHeight() - margin : margin + KEY_ROWS * mKeySize;
 
-    const S32 x = mPointerX - mKeyboardLeft, y = mKeyboardTop - 1 - mPointerY;
-    if (mInput.aim_valid && mPanelHit && x >= 0 && x < KEY_COLUMNS * mKeySize && y >= 0 && y < KEY_ROWS * mKeySize)
+    if (mPanelHit)
     {
-        mHoverColumn = x / mKeySize;
-        mHoverRow = y / mKeySize;
+        keyUnder(mPointerX, mPointerY, mHoverColumn, mHoverRow);
+    }
+    if (mLeftPanelHit)
+    {
+        keyUnder(mLeftPointerX, mLeftPointerY, mLeftHoverColumn, mLeftHoverRow);
+    }
+}
+
+// The keyboard key at a panel point (window pixels); column and row stay -1 off the keyboard.
+void LLViewerVR::keyUnder(S32 px, S32 py, S32& column, S32& row) const
+{
+    const S32 x = px - mKeyboardLeft, y = mKeyboardTop - 1 - py;
+    if (x >= 0 && x < KEY_COLUMNS * mKeySize && y >= 0 && y < KEY_ROWS * mKeySize)
+    {
+        column = x / mKeySize;
+        row = y / mKeySize;
     }
 }
 
@@ -711,24 +858,53 @@ void LLViewerVR::applyInput()
         gAgentCamera.resetView(true, false, false);
     }
 
-    // Left trigger is the Alt key of the mouse camera: pressing it while the laser is on an
+    // Left trigger, while the left laser is on the on-screen keyboard, types the key there.
+    // Otherwise it is the Alt key of the mouse camera: pressing it while the laser is on an
     // object or avatar makes that the camera's focus, and while it is held the right stick
     // zooms and orbits. The view stays there (showing the own avatar) until the avatar walks.
     // shortcut: no zoom onto bare ground, the laser's world hit does not include terrain.
-    if (input.zoom && !mZoomDown && mWorldHit && (mWorldHitPos - mBaseOrigin).length() > 0.5f)
+    updateKeyboard();
+    if (input.zoom != mZoomDown)
     {
-        gAgentCamera.setFocusOnAvatar(false, false);
-        gAgentCamera.setCameraPosAndFocusGlobal(gAgent.getPosGlobalFromAgent(mBaseOrigin),
-                                                gAgent.getPosGlobalFromAgent(mWorldHitPos), LLUUID::null);
-        gAgentCamera.setCameraAnimating(false); // no glide: the view just turns to the new focus
+        mZoomDown = input.zoom;
+        mZoomOnKeyboard = input.zoom && mLeftHoverRow >= 0; // its release goes nowhere either
+        if (mZoomOnKeyboard)
+        {
+            pressKey(keyAt(mLeftHoverColumn, mLeftHoverRow, mShift));
+        }
+        else if (input.zoom && mWorldHit && (mWorldHitPos - mBaseOrigin).length() > 0.5f)
+        {
+            mZoomYawOffset = 0.f; // the view turns to the new focus
+            gAgentCamera.setFocusOnAvatar(false, false);
+            gAgentCamera.setCameraPosAndFocusGlobal(gAgent.getPosGlobalFromAgent(mBaseOrigin),
+                                                    gAgent.getPosGlobalFromAgent(mWorldHitPos), LLUUID::null);
+            gAgentCamera.setCameraAnimating(false); // no glide: the view just turns to the new focus
+        }
     }
-    mZoomDown = input.zoom;
 
     // Right stick: sideways turns in steps, one step per push; up and down is jump/fly up
     // and crouch/fly down like Page Up and Page Down, and held up it starts flying.
     const F32 x = input.turn[0], y = input.turn[1];
-    const bool zooming = input.zoom && !gAgentCamera.getFocusOnAvatar();
+    const bool zooming = input.zoom && !mZoomOnKeyboard && !gAgentCamera.getFocusOnAvatar();
     const bool stick_free = !input.grab && !zooming;
+    if (zooming && !input.grab && fabsf(x) < STICK_OFF && mWorldHit)
+    {
+        // While held, the focus follows the laser: zoom in to the top of a tree after pressing
+        // at its foot. Not while orbiting, where the laser sweeps past the focus. The camera
+        // stays put but turns to the new focus; turning the tracking space back by as much
+        // keeps the view (and the laser's hit) still, which would otherwise feed back.
+        const LLVector3 focus = gAgent.getPosAgentFromGlobal(gAgentCamera.getFocusTargetGlobal());
+        const LLVector3 to_old = focus - mBaseOrigin, to_new = mWorldHitPos - mBaseOrigin;
+        auto level = [](const LLVector3& v) { return sqrtf(v.mV[VX] * v.mV[VX] + v.mV[VY] * v.mV[VY]); };
+        if ((mWorldHitPos - focus).length() > ZOOM_RETARGET && to_new.length() > 0.5f
+            && level(to_old) > 0.1f && level(to_new) > 0.1f) // straight above or below gives no heading
+        {
+            mZoomYawOffset += atan2f(to_old.mV[VY], to_old.mV[VX]) - atan2f(to_new.mV[VY], to_new.mV[VX]);
+            gAgentCamera.setCameraPosAndFocusGlobal(gAgent.getPosGlobalFromAgent(mBaseOrigin),
+                                                    gAgent.getPosGlobalFromAgent(mWorldHitPos), LLUUID::null);
+            gAgentCamera.setCameraAnimating(false);
+        }
+    }
     if (zooming && !input.grab)
     {
         const F32 step = ZOOM_RATE * llmin((F32)gFrameIntervalSeconds, 0.1f);
@@ -776,7 +952,6 @@ void LLViewerVR::applyInput()
     // Trigger is the left mouse button, grip the right one. On the panel they go through
     // the UI like a mouse click at that spot; elsewhere straight to the current tool, whose
     // pick then follows the laser (overridePickRay). A release takes the route its press took.
-    updateKeyboard();
     LLWindow* window = gViewerWindow->getWindow();
     const MASK mask = gKeyboard ? gKeyboard->currentMask(true) : MASK_NONE;
     const LLCoordGL pointer(mPointerX, mPointerY);

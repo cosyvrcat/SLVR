@@ -1345,10 +1345,19 @@ void LLRender::setSceneBlendType(eBlendType type)
     }
 }
 
+// SLVR: while set, ordinary alpha blending accumulates alpha as coverage instead of squaring
+// it. For drawing the UI into an empty, see-through image (the VR panel, llviewerVR.cpp).
+bool gGLCoverageAlpha = false;
+
 void LLRender::blendFunc(eBlendFactor sfactor, eBlendFactor dfactor)
 {
     llassert(sfactor < BF_UNDEF);
     llassert(dfactor < BF_UNDEF);
+    if (gGLCoverageAlpha && sfactor == BF_SOURCE_ALPHA && dfactor == BF_ONE_MINUS_SOURCE_ALPHA)
+    {
+        blendFunc(sfactor, dfactor, BF_ONE, BF_ONE_MINUS_SOURCE_ALPHA);
+        return;
+    }
     if (mCurrBlendColorSFactor != sfactor || mCurrBlendColorDFactor != dfactor ||
         mCurrBlendAlphaSFactor != sfactor || mCurrBlendAlphaDFactor != dfactor)
     {

@@ -54,9 +54,12 @@ private:
     void setEyeCamera();
     LLVector3 toAgent(const LLVector3& local) const;
     void updatePointer();
+    void updateLeftPointer();
+    bool hitPanel(const float pos[3], const float dir[3], S32& x, S32& y, F32& distance) const;
     void updateKeyboard();
+    void keyUnder(S32 x, S32 y, S32& column, S32& row) const;
     void pressKey(llwchar code);
-    void drawLaser();
+    void drawLaser(const LLVector3& start, const LLVector3& dir, F32 length);
     void drawPanel();
     void applyInput();
     static void onIdle(void* self);
@@ -77,9 +80,20 @@ private:
     S32 mPointerX = 0, mPointerY = 0; // where the laser meets the panel: window pixels, origin bottom left
     bool mWorldHit = false;     // the laser lands on an object or avatar, at mWorldHitPos
     LLVector3 mWorldHitPos;
+    // Hand poses steadied against tremor (see steady()), in tracking space.
+    struct SteadyPose { bool valid = false; float pos[3]; float dir[3]; F32 speed = 0.f; };
+    SteadyPose mSteady, mLeftSteady;
+    static void steady(SteadyPose& s, const float pos[3], const float rot[4], F32 dt);
+    static void checkSteady();
+    // Left laser: only while the on-screen keyboard is shown, so both hands can type.
+    bool mLeftLaserValid = false, mLeftPanelHit = false;
+    LLVector3 mLeftLaserStart, mLeftLaserDir;
+    F32 mLeftLaserLength = 0.f;
+    S32 mLeftPointerX = 0, mLeftPointerY = 0;
     bool mMenuDown = false, mTriggerDown = false, mGripDown = false, mZoomDown = false, mTurned = false;
     bool mTriggerOnPanel = false, mGripOnPanel = false; // where the press went; its release follows
-    bool mTriggerOnKeyboard = false;
+    bool mTriggerOnKeyboard = false, mZoomOnKeyboard = false;
+    F32 mZoomYawOffset = 0.f; // tracking space heading relative to the zoomed camera's, see applyInput()
     LLFrameTimer mClickTimer;   // since the last trigger press on the panel, for double clicks
     S32 mClickX = 0, mClickY = 0;
     bool mUpHeld = false, mFlyTried = false; // right stick pushed up, and flying already asked for
@@ -97,6 +111,7 @@ private:
     bool mKeyboardShown = false, mShift = false;
     S32 mKeyboardLeft = 0, mKeyboardTop = 0, mKeySize = 0; // window pixels, origin bottom left
     S32 mHoverColumn = -1, mHoverRow = -1;                 // key under the laser; row 0 is the top one
+    S32 mLeftHoverColumn = -1, mLeftHoverRow = -1;         // key under the left laser
 
     bool mFirstPerson = false;            // this frame is seen from the avatar's eyes
     bool mAttachmentsFirstPerson = false; // what the attachments' visibility was last set for

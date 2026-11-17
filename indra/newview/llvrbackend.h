@@ -35,6 +35,9 @@ struct LLVRInput
     bool aim_valid = false;       // right hand is tracked; aim_pos/aim_rot are usable
     float aim_pos[3] = { 0.f, 0.f, 0.f };     // right-hand pointing pose in tracking space,
     float aim_rot[4] = { 0.f, 0.f, 0.f, 1.f }; // pointing along its -Z
+    bool left_aim_valid = false;  // the same for the left hand
+    float left_aim_pos[3] = { 0.f, 0.f, 0.f };
+    float left_aim_rot[4] = { 0.f, 0.f, 0.f, 1.f };
 };
 
 class LLVRBackend
