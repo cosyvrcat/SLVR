@@ -632,7 +632,7 @@ void LLVRKeyboard::selfCheck()
     const Hit key = keyboard.hitAt((S32)q.getCenterX(), (S32)q.getCenterY());
     llassert_always(key.part == KEY && key.index == 0 && keyBoxes(0)[0].def.action == TEXT);
     llassert_always(keyboard.hitAt(WIDTH / 2, 20).part == HANDLE);
-    llassert_always(keyboard.hitAt(MARGIN + 10, (S32)SUGGEST_BOTTOM + 10).part == SUGGESTION);
+    llassert_always(keyboard.hitAt((S32)MARGIN + 10, (S32)SUGGEST_BOTTOM + 10).part == SUGGESTION);
     llassert_always(keyboard.hitAt(WIDTH + 5, 20).part == NONE);
 
     // Completion: most frequent first, in the case typed.
