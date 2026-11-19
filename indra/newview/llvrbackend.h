@@ -65,12 +65,14 @@ public:
     // Copies a rectangle of the window's back buffer into the image for one eye.
     bool submitEye(int eye, int x, int y, int width, int height);
 
-    // The flat UI as a panel in the headset. beginUI() binds a width x height RGBA image as
-    // the GL framebuffer; draw into it (alpha = coverage, premultiplied), then call endUI()
-    // with the panel's centre and orientation (quaternion x, y, z, w; identity faces +Z) in
-    // tracking space and its size in metres. The image has a depth buffer.
-    // endUI() rebinds the window's framebuffer. Only between beginFrame() and endFrame().
-    bool beginUI(int width, int height);
+    // Flat images shown as quads in the headset, each layer over the ones before it: the UI
+    // panel and the on-screen keyboard. beginUI() binds a width x height RGBA image of that
+    // layer as the GL framebuffer; draw into it (alpha = coverage, premultiplied), then call
+    // endUI() with the quad's centre and orientation (quaternion x, y, z, w; identity faces +Z)
+    // in tracking space and its size in metres. The image has a depth buffer. endUI()
+    // rebinds the window's framebuffer. One layer at a time, between beginFrame() and endFrame().
+    enum { UI_PANEL = 0, UI_KEYBOARD = 1, UI_LAYERS = 2 };
+    bool beginUI(int layer, int width, int height);
     void endUI(const float centre[3], const float rot[4], float width_m, float height_m);
 
     // Hands the frame to the runtime. Safe to call when no frame was begun.

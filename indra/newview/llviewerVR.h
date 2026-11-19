@@ -15,8 +15,15 @@
 #define LL_LLVIEWERVR_H
 
 #include "llframetimer.h"
+#include "llrect.h"
 #include "llvrbackend.h"
+#include "llvrkeyboard.h"
 #include "v3math.h"
+
+#include <boost/signals2/connection.hpp>
+#include <vector>
+
+class LLChat;
 
 class LLViewerVR
 {
@@ -47,6 +54,10 @@ public:
     // being in mouselook, which would switch off the UI and the click tools.
     bool firstPerson() const { return mFirstPerson; }
 
+    // LLNotificationManager::onChat() hook: nearby chat came in. While the panel is hidden,
+    // a message from someone else lights a dot in view (instant messages are seen directly).
+    void noteChat(const LLChat& chat);
+
     void shutdown();
 
 private:
@@ -56,11 +67,19 @@ private:
     void updatePointer();
     void updateLeftPointer();
     bool hitPanel(const float pos[3], const float dir[3], S32& x, S32& y, F32& distance) const;
+    static bool hitQuad(const float centre[3], const float rot[4], F32 width, F32 height, S32 image_width, S32 image_height,
+                        const float pos[3], const float dir[3], S32& x, S32& y, F32& distance);
+    bool pointAtKeyboard(S32 hand, const float pos[3], const float dir[3], F32& length);
     void updateKeyboard();
-    void keyUnder(S32 x, S32 y, S32& column, S32& row) const;
-    void pressKey(llwchar code);
+    void pressKeyboard(S32 hand);
+    void releaseKeyboard(S32 hand);
+    void showChat();
+    void noteMessage(const LLUUID& from);
     void drawLaser(const LLVector3& start, const LLVector3& dir, F32 length);
     void drawPanel();
+    void eraseAllButChat(S32 width, S32 height);
+    void drawKeyboard();
+    void drawMessageDot();
     void applyInput();
     static void onIdle(void* self);
 
@@ -72,7 +91,11 @@ private:
     // Controllers: read while rendering, acted on from the next idle() like other input.
     LLVRInput mInput;
     bool mInputFresh = false;   // mInput was read this frame and not yet acted on
-    bool mPanelVisible = true;  // toggled with the menu button
+    bool mPanelVisible = true;  // the menu button steps through all of it, chat only, and hidden
+    bool mChatOnly = false;
+    std::vector<LLRect> mPanelKeep; // with chat only: what is left of the panel, window pixels
+    bool mUnread = false;       // a message came in while the panel was hidden
+    boost::signals2::connection mIMConnection;
     bool mLaserValid = false;   // right hand is tracked: the laser is drawn and steers world picks
     bool mPanelHit = false;     // the laser points at the UI panel
     LLVector3 mLaserStart, mLaserDir; // agent coordinates
@@ -91,7 +114,7 @@ private:
     F32 mLeftLaserLength = 0.f;
     S32 mLeftPointerX = 0, mLeftPointerY = 0;
     bool mMenuDown = false, mTriggerDown = false, mGripDown = false, mZoomDown = false, mTurned = false;
-    bool mTriggerOnPanel = false, mGripOnPanel = false; // where the press went; its release follows
+    bool mTriggerOnPanel = false, mGripOnPanel = false, mGripOnKeyboard = false; // where the press went; its release follows
     bool mTriggerOnKeyboard = false, mZoomOnKeyboard = false;
     F32 mZoomYawOffset = 0.f; // tracking space heading relative to the zoomed camera's, see applyInput()
     LLFrameTimer mClickTimer;   // since the last trigger press on the panel, for double clicks
@@ -106,12 +129,24 @@ private:
     F32 mPanelWidth = 1.8f;                      // metres; the height follows the window's aspect ratio
     bool mGrabbing = false;
     F32 mGrabDistance = 1.5f;
+    LLFrameTimer mGrabTimer;  // left grip held for this long
+    bool mGrabLong = false;   // and long enough to take the panel
 
-    // On-screen keyboard, drawn on the panel while a text field has the keyboard focus.
-    bool mKeyboardShown = false, mShift = false;
-    S32 mKeyboardLeft = 0, mKeyboardTop = 0, mKeySize = 0; // window pixels, origin bottom left
-    S32 mHoverColumn = -1, mHoverRow = -1;                 // key under the laser; row 0 is the top one
-    S32 mLeftHoverColumn = -1, mLeftHoverRow = -1;         // key under the left laser
+    // On-screen keyboard: a quad of its own in tracking space while a text field has the
+    // keyboard focus. Hands are 0 right, 1 left.
+    LLVRKeyboard mKeyboard;
+    bool mKeyboardShown = false, mKeyboardPlaced = false;
+    float mKeyboardCentre[3] = { 0.f, -0.3f, -0.5f };
+    float mKeyboardRot[4] = { 0.f, 0.f, 0.f, 1.f };
+    F32 mKeyboardWidth = 0.55f;
+    LLVRKeyboard::Hit mKeyboardHit[2]; // what each laser is on
+    S32 mKeyboardX[2] = {}, mKeyboardY[2] = {}; // and where, keyboard image pixels
+    S32 mDragHand = -1;       // hand moving the keyboard by its handle
+    F32 mDragDistance = 0.5f;
+    S32 mRepeatHand = -1;     // hand holding down a repeating key
+    LLVRKeyboard::Hit mRepeatHit;
+    LLFrameTimer mRepeatTimer;
+    F32 mRepeatNext = 0.f;
 
     bool mFirstPerson = false;            // this frame is seen from the avatar's eyes
     bool mAttachmentsFirstPerson = false; // what the attachments' visibility was last set for

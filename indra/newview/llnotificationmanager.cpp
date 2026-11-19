@@ -33,6 +33,7 @@
 
 #include "llfloaterimnearbychathandler.h"
 #include "llnotifications.h"
+#include "llviewerVR.h"
 
 using namespace LLNotificationsUI;
 
@@ -66,6 +67,7 @@ void LLNotificationManager::init()
 //--------------------------------------------------------------------------
 void LLNotificationManager::onChat(const LLChat& msg, const LLSD &args)
 {
+    gVR.noteChat(msg); // SLVR: a dot in the headset while the UI panel is hidden
     if(mChatHandler)
         mChatHandler->processChat(msg, args);
 }

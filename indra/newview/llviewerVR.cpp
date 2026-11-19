@@ -15,9 +15,12 @@
 #include "llagentcamera.h"
 #include "llappviewer.h"
 #include "llcallbacklist.h"
+#include "llchat.h"
 #include "llfocusmgr.h"
-#include "llfontgl.h"
+#include "llfloater.h"
+#include "llfloaterreg.h"
 #include "llgl.h"
+#include "llimview.h"
 #include "llglstates.h"
 #include "llkeyboard.h"
 #include "llnotificationsutil.h"
@@ -28,6 +31,7 @@
 #include "lluictrl.h"
 #include "llviewercamera.h"
 #include "llviewercontrol.h"
+#include "llviewermenu.h"
 #include "llviewerobject.h"
 #include "llviewershadermgr.h"
 #include "llviewerwindow.h"
@@ -84,47 +88,15 @@ namespace
     const F32 PANEL_NARROW = 0.4f, PANEL_WIDE = 4.f;
     const F32 PANEL_RATE = 1.5f; // e-foldings per second at full stick
 
-    // On-screen keyboard: four rows of characters and a row of wide keys, KEY_COLUMNS wide.
-    // UTF-8 as byte escapes so the source file's encoding cannot matter.
-    // shortcut: one fixed (Turkish Q) layout, Shift stays on until pressed again, no key
-    // repeat; make the layout a setting when another language needs typing.
-    const S32 KEY_COLUMNS = 12;
-    const S32 KEY_ROWS = 5;
-    const char* const KEY_CHARS[2][4] = {
-        { "1234567890'-", "qwertyu\xC4\xB1" "op\xC4\x9F\xC3\xBC", "asdfghjkl\xC5\x9F" "i,", "zxcvbnm\xC3\xB6\xC3\xA7" ".:?" },
-        { "!\"#$%&/()=*_", "QWERTYUIOP\xC4\x9E\xC3\x9C", "ASDFGHJKL\xC5\x9E\xC4\xB0" ";", "ZXCVBNM\xC3\x96\xC3\x87" "@+<" },
-    };
-    const llwchar OSK_SHIFT = 1, OSK_BACKSPACE = 2, OSK_ENTER = 3, OSK_CLOSE = 4; // below any character
-    struct WideKey { const char* label; S32 columns; llwchar code; };
-    const WideKey WIDE_KEYS[] = {
-        { "Shift", 2, OSK_SHIFT }, { "Space", 4, ' ' }, { "<--", 2, OSK_BACKSPACE }, { "Enter", 2, OSK_ENTER }, { "Close", 2, OSK_CLOSE },
-    };
+    // The on-screen keyboard's quad: its width in metres, and where it first appears relative
+    // to the head (metres ahead and below), tilted to face it.
+    const F32 KEYBOARD_WIDTH = 0.55f, KEYBOARD_NARROW = 0.25f, KEYBOARD_WIDE = 1.5f;
+    const F32 KEYBOARD_AHEAD = 0.5f, KEYBOARD_BELOW = 0.3f;
+    const F32 KEY_REPEAT_DELAY = 0.5f, KEY_REPEAT_INTERVAL = 0.07f; // seconds, for backspace held down
 
-    // The key at a column and row (0 = top) of the keyboard; 0 where there is none.
-    llwchar keyAt(S32 column, S32 row, bool shift)
-    {
-        if (column < 0 || column >= KEY_COLUMNS)
-        {
-            return 0;
-        }
-        if (row >= 0 && row < KEY_ROWS - 1)
-        {
-            return utf8str_to_wstring(KEY_CHARS[shift ? 1 : 0][row])[column];
-        }
-        if (row == KEY_ROWS - 1)
-        {
-            S32 first = 0;
-            for (const WideKey& key : WIDE_KEYS)
-            {
-                if (column < first + key.columns)
-                {
-                    return key.code;
-                }
-                first += key.columns;
-            }
-        }
-        return 0;
-    }
+    // What "chat only" keeps of the panel: Firestorm's conversation windows, docked or torn off.
+    const char* const CHAT_FLOATERS[] = { "fs_im_container", "fs_nearby_chat", "fs_impanel" };
+    const F32 MESSAGE_DOT_RADIUS = 0.012f; // metres, a metre ahead
 
     const F32 SNAP_TURN = 30.f * DEG_TO_RAD;
     const F32 STICK_ON = 0.6f;       // a thumbstick counts as pushed beyond this
@@ -136,6 +108,7 @@ namespace
     const F32 DOUBLE_CLICK_TIME = 0.5f; // seconds
     const S32 DOUBLE_CLICK_SLOP = 40;   // pixels the laser may wander between the two clicks
     const F32 ZOOM_RETARGET = 0.1f;     // metres the laser's hit moves before the zoom focus follows it
+    const F32 GRAB_HOLD = 0.4f;         // seconds the left grip is held before it takes the panel: a brush must not move it
 
     // Laser steadying, see LLViewerVR::steady(): cutoff frequencies in Hz, and how much a
     // swing of one radian per second raises the cutoff.
@@ -168,16 +141,6 @@ namespace
         facing(dir, q);
         rotate(q, face, out);
         llassert_always(fabsf(out[0] + dir[0]) + fabsf(out[1] + dir[1]) + fabsf(out[2] + dir[2]) < 1e-4f);
-
-        // Every keyboard row is full, and the wide keys fill the last one.
-        for (S32 row = 0; row < KEY_ROWS - 1; ++row)
-        {
-            llassert_always(utf8str_to_wstring(KEY_CHARS[0][row]).size() == (size_t)KEY_COLUMNS);
-            llassert_always(utf8str_to_wstring(KEY_CHARS[1][row]).size() == (size_t)KEY_COLUMNS);
-        }
-        llassert_always(keyAt(0, 1, false) == 'q' && keyAt(0, 1, true) == 'Q' && keyAt(7, 1, false) == 0x131);
-        llassert_always(keyAt(0, KEY_ROWS - 1, false) == OSK_SHIFT && keyAt(2, KEY_ROWS - 1, false) == ' ');
-        llassert_always(keyAt(KEY_COLUMNS - 1, KEY_ROWS - 1, false) == OSK_CLOSE && keyAt(KEY_COLUMNS, 0, false) == 0);
     }
 }
 
@@ -191,6 +154,7 @@ void LLViewerVR::updateEnabled()
         LL_INFOS("VR") << "VR enabled, starting OpenXR" << LL_ENDL;
         checkConventions();
         checkSteady();
+        LLVRKeyboard::selfCheck();
         std::string error;
         if (!mBackend.init(error))
         {
@@ -199,7 +163,16 @@ void LLViewerVR::updateEnabled()
             return;
         }
         mPanelVisible = true;
+        mChatOnly = mUnread = false;
         gIdleCallbacks.addFunction(onIdle, this);
+        // Instant messages; nearby chat comes through noteChat().
+        mIMConnection = LLIMModel::instance().addNewMsgCallback([this](const LLSD& msg)
+        {
+            if (!msg["is_region_msg"].asBoolean())
+            {
+                noteMessage(msg["from_id"].asUUID());
+            }
+        });
         // The headset paces the frames; waiting for the monitor's vsync as well would cap and
         // judder VR at the monitor's refresh rate.
         gViewerWindow->getWindow()->toggleVSync(false);
@@ -220,6 +193,10 @@ void LLViewerVR::shutdown()
     mBackend.shutdown();
     mLaserValid = mPanelHit = mWorldHit = mFirstPerson = mLeftLaserValid = mLeftPanelHit = false;
     mSteady.valid = mLeftSteady.valid = false;
+    mKeyboardShown = mKeyboardPlaced = false;
+    mKeyboardHit[0] = mKeyboardHit[1] = LLVRKeyboard::Hit();
+    mDragHand = mRepeatHand = -1;
+    mIMConnection.disconnect();
     if (was_running && gViewerWindow)
     {
         gViewerWindow->getWindow()->toggleVSync(gSavedSettings.getBOOL("RenderVSyncEnable"));
@@ -361,6 +338,10 @@ bool LLViewerVR::endEye()
     {
         drawLaser(mLeftLaserStart, mLeftLaserDir, mLeftLaserLength);
     }
+    if (mUnread && !mPanelVisible)
+    {
+        drawMessageDot();
+    }
     const LLRect view = gViewerWindow->getWorldViewRectRaw();
     mBackend.submitEye(mEye, view.mLeft, view.mBottom, view.getWidth(), view.getHeight());
 
@@ -375,6 +356,10 @@ bool LLViewerVR::endEye()
     if (mPanelVisible)
     {
         drawPanel();
+    }
+    if (mKeyboardShown)
+    {
+        drawKeyboard();
     }
     mBackend.endFrame();
 
@@ -393,8 +378,8 @@ const F32* LLViewerVR::eyeTanFov() const
     return (mEye >= 0 && !gCubeSnapshot) ? mEyes[mEye].tan_fov : nullptr;
 }
 
-// Works out where the right controller points: at the UI panel, or else into the world.
-// While the left grip is held the panel is carried along on the laser instead.
+// Works out where the right controller points: at the keyboard, the UI panel, or else into
+// the world. While the left grip is held the panel is carried along on the laser instead.
 void LLViewerVR::updatePointer()
 {
     updateLeftPointer();
@@ -402,6 +387,7 @@ void LLViewerVR::updatePointer()
     {
         mGrabbing = false;
         mSteady.valid = false;
+        mKeyboardHit[0] = LLVRKeyboard::Hit();
         return;
     }
     steady(mSteady, mInput.aim_pos, mInput.aim_rot, (F32)gFrameIntervalSeconds);
@@ -413,7 +399,7 @@ void LLViewerVR::updatePointer()
     mLaserDir = toAgent(trackingToLocal(dir));
     mLaserLength = LASER_LENGTH;
 
-    if (mInput.grab && mPanelVisible)
+    if (mGrabLong && mPanelVisible)
     {
         if (!mGrabbing)
         {
@@ -431,10 +417,15 @@ void LLViewerVR::updatePointer()
         }
         facing(dir, mPanelRot);
         mLaserLength = mGrabDistance;
+        mKeyboardHit[0] = LLVRKeyboard::Hit();
         return;
     }
     mGrabbing = false;
 
+    if (pointAtKeyboard(0, pos, dir, mLaserLength))
+    {
+        return;
+    }
     if (hitPanel(pos, dir, mPointerX, mPointerY, mLaserLength))
     {
         mPanelHit = true;
@@ -460,6 +451,7 @@ void LLViewerVR::updateLeftPointer()
     if (!mInput.left_aim_valid || !mKeyboardShown)
     {
         mLeftSteady.valid = false;
+        mKeyboardHit[1] = LLVRKeyboard::Hit();
         return;
     }
     steady(mLeftSteady, mInput.left_aim_pos, mInput.left_aim_rot, (F32)gFrameIntervalSeconds);
@@ -467,21 +459,95 @@ void LLViewerVR::updateLeftPointer()
     mLeftLaserStart = mBaseOrigin + toAgent(trackingToLocal(mLeftSteady.pos));
     mLeftLaserDir = toAgent(trackingToLocal(mLeftSteady.dir));
     mLeftLaserLength = LASER_LENGTH;
-    mLeftPanelHit = hitPanel(mLeftSteady.pos, mLeftSteady.dir, mLeftPointerX, mLeftPointerY, mLeftLaserLength);
+    if (!pointAtKeyboard(1, mLeftSteady.pos, mLeftSteady.dir, mLeftLaserLength))
+    {
+        mLeftPanelHit = hitPanel(mLeftSteady.pos, mLeftSteady.dir, mLeftPointerX, mLeftPointerY, mLeftLaserLength);
+    }
+}
+
+// Whether a hand's laser (tracking space) is on the keyboard, which lies in front of the
+// panel; if so what it is on (mKeyboardHit) and how far along. A hand dragging the keyboard
+// by its handle carries it along its laser, the right stick moving it nearer and resizing it.
+bool LLViewerVR::pointAtKeyboard(S32 hand, const float pos[3], const float dir[3], F32& length)
+{
+    mKeyboardHit[hand] = LLVRKeyboard::Hit();
+    if (!mKeyboardShown)
+    {
+        return false;
+    }
+    const F32 height = mKeyboardWidth * LLVRKeyboard::HEIGHT / LLVRKeyboard::WIDTH;
+    if (mDragHand == hand)
+    {
+        const F32 step = PANEL_RATE * llmin((F32)gFrameIntervalSeconds, 0.1f);
+        mDragDistance = llclamp(mDragDistance * expf(mInput.turn[1] * step), PANEL_NEAR, PANEL_FAR);
+        mKeyboardWidth = llclamp(mKeyboardWidth * expf(mInput.turn[0] * step), KEYBOARD_NARROW, KEYBOARD_WIDE);
+        facing(dir, mKeyboardRot);
+        // The handle, near the bottom edge, stays under the laser.
+        const float up_axis[3] = { 0.f, 1.f, 0.f };
+        float up[3];
+        rotate(mKeyboardRot, up_axis, up);
+        const F32 above = (0.5f - (F32)LLVRKeyboard::HANDLE_Y / LLVRKeyboard::HEIGHT) * height;
+        for (S32 i = 0; i < 3; ++i)
+        {
+            mKeyboardCentre[i] = pos[i] + dir[i] * mDragDistance + up[i] * above;
+        }
+        mKeyboardHit[hand].part = LLVRKeyboard::HANDLE;
+        length = mDragDistance;
+        return true;
+    }
+    S32 x = 0, y = 0;
+    F32 along = 0.f;
+    if (!hitQuad(mKeyboardCentre, mKeyboardRot, mKeyboardWidth, height, LLVRKeyboard::WIDTH, LLVRKeyboard::HEIGHT, pos, dir, x, y, along))
+    {
+        return false;
+    }
+    const LLVRKeyboard::Hit hit = mKeyboard.hitAt(x, y);
+    if (hit.part == LLVRKeyboard::NONE)
+    {
+        return false; // the empty corners beside the handle
+    }
+    mKeyboardHit[hand] = hit;
+    mKeyboardX[hand] = x;
+    mKeyboardY[hand] = y;
+    length = along;
+    return true;
 }
 
 // Where a ray (tracking space) meets the UI panel: window pixels, origin bottom left, and
-// the distance along the ray. Leaves the outputs alone when it misses.
+// the distance along the ray. Leaves the outputs alone when it misses. With only the chat
+// shown, the rest of the panel lets the laser through.
 bool LLViewerVR::hitPanel(const float pos[3], const float dir[3], S32& x, S32& y, F32& distance) const
 {
-    // Into the panel's own frame (x right, y up, z out of its face): it lies in z = 0.
     const LLRect window = gViewerWindow->getWindowRectRaw();
     if (!mPanelVisible || window.getWidth() <= 0 || window.getHeight() <= 0)
     {
         return false;
     }
-    const float inverse[4] = { -mPanelRot[0], -mPanelRot[1], -mPanelRot[2], mPanelRot[3] };
-    const float offset[3] = { pos[0] - mPanelCentre[0], pos[1] - mPanelCentre[1], pos[2] - mPanelCentre[2] };
+    S32 px = 0, py = 0;
+    F32 along = 0.f;
+    if (!hitQuad(mPanelCentre, mPanelRot, mPanelWidth, mPanelWidth * window.getHeight() / window.getWidth(),
+                 window.getWidth(), window.getHeight(), pos, dir, px, py, along))
+    {
+        return false;
+    }
+    if (mChatOnly && std::none_of(mPanelKeep.begin(), mPanelKeep.end(), [&](const LLRect& r) { return r.pointInRect(px, py); }))
+    {
+        return false;
+    }
+    x = px;
+    y = py;
+    distance = along;
+    return true;
+}
+
+// Where a ray (tracking space) meets a quad of the given size in metres, showing an image
+// of image_width x image_height pixels: image pixels, origin bottom left, and the distance.
+bool LLViewerVR::hitQuad(const float centre[3], const float rot[4], F32 width, F32 height, S32 image_width, S32 image_height,
+                         const float pos[3], const float dir[3], S32& x, S32& y, F32& distance)
+{
+    // Into the quad's own frame (x right, y up, z out of its face): it lies in z = 0.
+    const float inverse[4] = { -rot[0], -rot[1], -rot[2], rot[3] };
+    const float offset[3] = { pos[0] - centre[0], pos[1] - centre[1], pos[2] - centre[2] };
     float local_pos[3], local_dir[3];
     rotate(inverse, offset, local_pos);
     rotate(inverse, dir, local_dir);
@@ -490,15 +556,14 @@ bool LLViewerVR::hitPanel(const float pos[3], const float dir[3], S32& x, S32& y
         return false;
     }
     const F32 along = -local_pos[2] / local_dir[2];
-    const F32 panel_height = mPanelWidth * window.getHeight() / window.getWidth();
-    const F32 u = (local_pos[0] + along * local_dir[0]) / mPanelWidth + 0.5f;
-    const F32 v = (local_pos[1] + along * local_dir[1]) / panel_height + 0.5f;
+    const F32 u = (local_pos[0] + along * local_dir[0]) / width + 0.5f;
+    const F32 v = (local_pos[1] + along * local_dir[1]) / height + 0.5f;
     if (along <= 0.f || u < 0.f || u >= 1.f || v < 0.f || v >= 1.f)
     {
         return false;
     }
-    x = llfloor(u * window.getWidth());
-    y = llfloor(v * window.getHeight());
+    x = llfloor(u * image_width);
+    y = llfloor(v * image_height);
     distance = along;
     return true;
 }
@@ -605,7 +670,7 @@ void LLViewerVR::drawPanel()
 {
     const LLRect window = gViewerWindow->getWindowRectRaw();
     const S32 width = window.getWidth(), height = window.getHeight();
-    if (!mBackend.beginUI(width, height))
+    if (!mBackend.beginUI(LLVRBackend::UI_PANEL, width, height))
     {
         return;
     }
@@ -662,47 +727,9 @@ void LLViewerVR::drawPanel()
 
     // The UI leaves a plain window-pixel coordinate system behind.
     gUIProgram.bind();
-    if (mKeyboardShown)
+    if (mChatOnly)
     {
-        const S32 size = mKeySize, gap = llmax(1, size / 16);
-        gl_rect_2d(mKeyboardLeft - gap, mKeyboardTop + gap, mKeyboardLeft + KEY_COLUMNS * size + gap,
-                   mKeyboardTop - KEY_ROWS * size - gap, LLColor4(0.08f, 0.08f, 0.1f, 1.f));
-        const LLFontGL* font = LLFontGL::getFontSansSerifHuge();
-        for (S32 row = 0; row < KEY_ROWS; ++row)
-        {
-            for (S32 column = 0; column < KEY_COLUMNS; )
-            {
-                const llwchar code = keyAt(column, row, mShift);
-                S32 columns = 1;
-                LLWString label(1, code);
-                if (row == KEY_ROWS - 1)
-                {
-                    S32 first = 0;
-                    for (const WideKey& key : WIDE_KEYS)
-                    {
-                        if (first == column)
-                        {
-                            columns = key.columns;
-                            label = utf8str_to_wstring(key.label);
-                        }
-                        first += key.columns;
-                    }
-                }
-                const S32 left = mKeyboardLeft + column * size, top = mKeyboardTop - row * size;
-                const bool hover = (row == mHoverRow && mHoverColumn >= column && mHoverColumn < column + columns)
-                    || (row == mLeftHoverRow && mLeftHoverColumn >= column && mLeftHoverColumn < column + columns);
-                const bool lit = hover || (code == OSK_SHIFT && mShift);
-                gl_rect_2d(left + gap, top - gap, left + columns * size - gap, top - size + gap,
-                           lit ? LLColor4(0.2f, 0.45f, 0.8f, 1.f) : LLColor4(0.22f, 0.22f, 0.26f, 1.f));
-                if (font)
-                {
-                    // Fonts take UI units, which the UI scale turns into pixels.
-                    font->render(label, 0, (left + columns * size / 2) / LLFontGL::sScaleX, (top - size / 2) / LLFontGL::sScaleY,
-                                 LLColor4::white, LLFontGL::HCENTER, LLFontGL::VCENTER);
-                }
-                column += columns;
-            }
-        }
+        eraseAllButChat(width, height);
     }
     // The mouse cursor is not part of the UI image; mark where the lasers land.
     for (S32 hand = 0; hand < 2; ++hand)
@@ -723,71 +750,253 @@ void LLViewerVR::drawPanel()
     mBackend.endUI(mPanelCentre, mPanelRot, mPanelWidth, mPanelWidth * height / width);
 }
 
+// With only the chat shown: the chat windows and open menus stay on the panel image, the
+// rest is made transparent. Their rectangles also bound where the lasers hit the panel.
+void LLViewerVR::eraseAllButChat(S32 width, S32 height)
+{
+    mPanelKeep.clear();
+    const LLVector2 scale = gViewerWindow->getDisplayScale();
+    auto keep = [&](const LLView* view)
+    {
+        const LLRect r = view->calcScreenRect(); // UI units
+        mPanelKeep.emplace_back(llfloor(r.mLeft * scale.mV[VX]), llceil(r.mTop * scale.mV[VY]),
+                                llceil(r.mRight * scale.mV[VX]), llfloor(r.mBottom * scale.mV[VY]));
+    };
+    for (const char* name : CHAT_FLOATERS)
+    {
+        for (const LLFloater* floater : LLFloaterReg::getFloaterList(name))
+        {
+            if (floater->isShown())
+            {
+                keep(floater);
+            }
+        }
+    }
+    for (const LLView* menu : *gMenuHolder->getChildList()) // context and pie menus
+    {
+        if (menu->getVisible())
+        {
+            keep(menu);
+        }
+    }
+
+    // Mark what stays in the depth buffer (the HUDs are done with it), then clear the rest.
+    {
+        LLGLDepthTest depth(GL_TRUE, GL_TRUE);
+        glClear(GL_DEPTH_BUFFER_BIT);
+    }
+    {
+        LLGLDepthTest depth(GL_TRUE, GL_TRUE, GL_ALWAYS);
+        glDepthRange(0.0, 0.0);
+        gGL.setColorMask(false, false);
+        for (const LLRect& r : mPanelKeep)
+        {
+            gl_rect_2d(r, LLColor4::white);
+        }
+        gGL.flush();
+    }
+    {
+        LLGLDepthTest depth(GL_TRUE, GL_FALSE, GL_EQUAL);
+        LLGLDisable blend(GL_BLEND);
+        glDepthRange(1.0, 1.0);
+        gGL.setColorMask(true, true);
+        gl_rect_2d(0, height, width, 0, LLColor4(0.f, 0.f, 0.f, 0.f));
+        gGL.flush();
+    }
+    glDepthRange(0.0, 1.0);
+}
+
+// Draws the on-screen keyboard into its own quad layer, in front of the panel.
+void LLViewerVR::drawKeyboard()
+{
+    const S32 width = LLVRKeyboard::WIDTH, height = LLVRKeyboard::HEIGHT;
+    if (!mBackend.beginUI(LLVRBackend::UI_KEYBOARD, width, height))
+    {
+        return;
+    }
+    GLint viewport[4];
+    glGetIntegerv(GL_VIEWPORT, viewport);
+    glViewport(0, 0, width, height);
+    gGL.setColorMask(true, true);
+    glClearColor(0.f, 0.f, 0.f, 0.f);
+    glClear(GL_COLOR_BUFFER_BIT);
+    {
+        LLGLSUIDefault gls_ui;
+        gl_state_for_2d(width, height);
+        gGLCoverageAlpha = true;
+        gGL.blendFunc(LLRender::BF_SOURCE_ALPHA, LLRender::BF_ONE_MINUS_SOURCE_ALPHA);
+        gUIProgram.bind();
+        mKeyboard.draw(mKeyboardHit);
+        for (S32 hand = 0; hand < 2; ++hand)
+        {
+            if (mKeyboardHit[hand].part != LLVRKeyboard::NONE && mDragHand != hand)
+            {
+                const S32 x = mKeyboardX[hand], y = mKeyboardY[hand];
+                gl_rect_2d(x - 6, y + 6, x + 6, y - 6, LLColor4::black);
+                gl_rect_2d(x - 4, y + 4, x + 4, y - 4, LLColor4::white);
+            }
+        }
+        gGL.flush();
+        gUIProgram.unbind();
+        gGLCoverageAlpha = false;
+        gGL.blendFunc(LLRender::BF_SOURCE_ALPHA, LLRender::BF_ONE_MINUS_SOURCE_ALPHA);
+    }
+    gGL.setColorMask(true, false);
+    glViewport(viewport[0], viewport[1], viewport[2], viewport[3]);
+    mBackend.endUI(mKeyboardCentre, mKeyboardRot, mKeyboardWidth, mKeyboardWidth * height / width);
+}
+
+// A dot low in the field of view while messages came in with the panel hidden; drawn into
+// the eye just rendered, fixed to the head so it is seen wherever one looks.
+void LLViewerVR::drawMessageDot()
+{
+    float head[3], offset[3], right[3], up[3];
+    const float AHEAD[3] = { 0.f, -0.3f, -1.f }, RIGHT[3] = { 1.f, 0.f, 0.f }, UP[3] = { 0.f, 1.f, 0.f };
+    rotate(mEyes[0].rot, AHEAD, offset);
+    rotate(mEyes[0].rot, RIGHT, right);
+    rotate(mEyes[0].rot, UP, up);
+    for (S32 i = 0; i < 3; ++i)
+    {
+        head[i] = (mEyes[0].pos[i] + mEyes[1].pos[i]) / 2.f + offset[i];
+    }
+    const LLVector3 centre = mBaseOrigin + toAgent(trackingToLocal(head));
+    const LLVector3 x_axis = toAgent(trackingToLocal(right)) * MESSAGE_DOT_RADIUS;
+    const LLVector3 y_axis = toAgent(trackingToLocal(up)) * MESSAGE_DOT_RADIUS;
+    const F32 glow = 0.7f + 0.3f * sinf((F32)LLFrameTimer::getElapsedSeconds() * 4.f);
+
+    gViewerWindow->setup3DRender();
+    LLGLSUIDefault gls_ui;
+    gUIProgram.bind();
+    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+    gGL.begin(LLRender::TRIANGLES);
+    gGL.color4f(1.f, 0.55f, 0.1f, glow);
+    const S32 STEPS = 24;
+    for (S32 i = 0; i < STEPS; ++i)
+    {
+        const F32 a0 = F_TWO_PI * i / STEPS, a1 = F_TWO_PI * (i + 1) / STEPS;
+        gGL.vertex3fv(centre.mV);
+        gGL.vertex3fv((centre + x_axis * cosf(a0) + y_axis * sinf(a0)).mV);
+        gGL.vertex3fv((centre + x_axis * cosf(a1) + y_axis * sinf(a1)).mV);
+    }
+    gGL.end();
+    gGL.flush();
+    gUIProgram.unbind();
+}
+
+void LLViewerVR::noteChat(const LLChat& chat)
+{
+    if (chat.mSourceType == CHAT_SOURCE_AGENT)
+    {
+        noteMessage(chat.mFromID);
+    }
+}
+
+void LLViewerVR::noteMessage(const LLUUID& from)
+{
+    if (mBackend.isInitialized() && !mPanelVisible && from.notNull() && from != gAgentID)
+    {
+        mUnread = true;
+    }
+}
+
+// Entering "chat only" with no conversation window open would leave nothing: open one.
+void LLViewerVR::showChat()
+{
+    for (const char* name : CHAT_FLOATERS)
+    {
+        for (const LLFloater* floater : LLFloaterReg::getFloaterList(name))
+        {
+            if (floater->isShown())
+            {
+                return;
+            }
+        }
+    }
+    LLFloaterReg::showInstance("fs_im_container");
+}
+
 void LLViewerVR::onIdle(void* self)
 {
     static_cast<LLViewerVR*>(self)->applyInput();
 }
 
-// Shows the on-screen keyboard while a text field has the keyboard focus, away from that
-// field: along the bottom of the panel, or along the top when the field is in the lower half.
+// Shows the on-screen keyboard while a text field has the keyboard focus. It first appears
+// below and ahead of the head; after that it stays where it was put.
 void LLViewerVR::updateKeyboard()
 {
     LLUICtrl* focus = dynamic_cast<LLUICtrl*>(gFocusMgr.getKeyboardFocus());
-    const LLRect window = gViewerWindow->getWindowRectRaw();
-    mKeySize = llmin(window.getHeight() / 14, window.getWidth() / KEY_COLUMNS);
-    mKeyboardShown = mPanelVisible && focus && focus->acceptsTextInput() && mKeySize >= 8;
-    mHoverColumn = mHoverRow = mLeftHoverColumn = mLeftHoverRow = -1;
-    if (!mKeyboardShown)
+    const bool shown = mPanelVisible && focus && focus->acceptsTextInput();
+    if (!shown)
     {
+        if (mKeyboardShown)
+        {
+            mKeyboard.reset();
+        }
+        mKeyboardShown = false;
+        mDragHand = mRepeatHand = -1;
         return;
     }
-    const F32 focus_y = focus->calcScreenRect().getCenterY() * gViewerWindow->getDisplayScale().mV[VY];
-    const S32 margin = mKeySize / 2;
-    mKeyboardLeft = (window.getWidth() - KEY_COLUMNS * mKeySize) / 2;
-    mKeyboardTop = focus_y < window.getHeight() / 2 ? window.getHeight() - margin : margin + KEY_ROWS * mKeySize;
-
-    if (mPanelHit)
+    if (!mKeyboardPlaced)
     {
-        keyUnder(mPointerX, mPointerY, mHoverColumn, mHoverRow);
+        mKeyboardPlaced = true;
+        const float FORWARD[3] = { 0.f, 0.f, -1.f };
+        float look[3], head[3], dir[3];
+        rotate(mEyes[0].rot, FORWARD, look);
+        F32 level = sqrtf(look[0] * look[0] + look[2] * look[2]);
+        if (level < 0.1f) // looking straight up or down: put it ahead of the seat instead
+        {
+            look[0] = 0.f;
+            look[2] = -1.f;
+            level = 1.f;
+        }
+        for (S32 i = 0; i < 3; ++i)
+        {
+            head[i] = (mEyes[0].pos[i] + mEyes[1].pos[i]) / 2.f;
+        }
+        mKeyboardWidth = KEYBOARD_WIDTH;
+        mKeyboardCentre[0] = head[0] + look[0] / level * KEYBOARD_AHEAD;
+        mKeyboardCentre[1] = head[1] - KEYBOARD_BELOW;
+        mKeyboardCentre[2] = head[2] + look[2] / level * KEYBOARD_AHEAD;
+        const LLVector3 to_keyboard(mKeyboardCentre[0] - head[0], mKeyboardCentre[1] - head[1], mKeyboardCentre[2] - head[2]);
+        const F32 distance = to_keyboard.length();
+        for (S32 i = 0; i < 3; ++i)
+        {
+            dir[i] = to_keyboard.mV[i] / distance;
+        }
+        facing(dir, mKeyboardRot);
     }
-    if (mLeftPanelHit)
+    mKeyboardShown = true;
+    mKeyboard.update();
+}
+
+// Trigger pressed while a hand's laser is on the keyboard: the handle starts a drag, a
+// key or suggestion is typed (backspace repeats while held).
+void LLViewerVR::pressKeyboard(S32 hand)
+{
+    const LLVRKeyboard::Hit hit = mKeyboardHit[hand];
+    if (hit.part == LLVRKeyboard::HANDLE)
     {
-        keyUnder(mLeftPointerX, mLeftPointerY, mLeftHoverColumn, mLeftHoverRow);
+        mDragHand = hand;
+        mDragDistance = hand ? mLeftLaserLength : mLaserLength;
+    }
+    else if (mKeyboard.press(hit))
+    {
+        mRepeatHand = hand;
+        mRepeatHit = hit;
+        mRepeatTimer.reset();
+        mRepeatNext = KEY_REPEAT_DELAY;
     }
 }
 
-// The keyboard key at a panel point (window pixels); column and row stay -1 off the keyboard.
-void LLViewerVR::keyUnder(S32 px, S32 py, S32& column, S32& row) const
+void LLViewerVR::releaseKeyboard(S32 hand)
 {
-    const S32 x = px - mKeyboardLeft, y = mKeyboardTop - 1 - py;
-    if (x >= 0 && x < KEY_COLUMNS * mKeySize && y >= 0 && y < KEY_ROWS * mKeySize)
+    if (mDragHand == hand)
     {
-        column = x / mKeySize;
-        row = y / mKeySize;
+        mDragHand = -1;
     }
-}
-
-void LLViewerVR::pressKey(llwchar code)
-{
-    if (code == OSK_SHIFT)
+    if (mRepeatHand == hand)
     {
-        mShift = !mShift;
-    }
-    else if (code == OSK_BACKSPACE)
-    {
-        gViewerWindow->handleKey(KEY_BACKSPACE, MASK_NONE);
-    }
-    else if (code == OSK_ENTER)
-    {
-        gViewerWindow->handleKey(KEY_RETURN, MASK_NONE);
-    }
-    else if (code == OSK_CLOSE)
-    {
-        gFocusMgr.setKeyboardFocus(nullptr);
-    }
-    else if (code)
-    {
-        gViewerWindow->handleUnicodeChar(code, MASK_NONE);
+        mRepeatHand = -1;
     }
 }
 
@@ -816,14 +1025,43 @@ void LLViewerVR::applyInput()
         gAgentAvatarp->updateAttachmentVisibility(gAgentCamera.getCameraMode());
     }
 
+    // The menu button steps through the whole panel, the chat alone, and nothing.
     if (input.menu && !mMenuDown)
     {
-        mPanelVisible = !mPanelVisible;
+        if (!mPanelVisible)
+        {
+            mPanelVisible = true;
+        }
+        else if (!mChatOnly)
+        {
+            mChatOnly = true;
+            showChat();
+        }
+        else
+        {
+            mPanelVisible = mChatOnly = false;
+        }
     }
     mMenuDown = input.menu;
-    if (input.grab)
+
+    // The left grip takes the panel only when held a moment: brushing it must not move it.
+    if (!input.grab)
+    {
+        mGrabTimer.stop();
+    }
+    else if (!mGrabTimer.getStarted())
+    {
+        mGrabTimer.start();
+    }
+    mGrabLong = input.grab && mGrabTimer.getElapsedTimeF32() > GRAB_HOLD;
+    if (mGrabLong && !mPanelVisible)
     {
         mPanelVisible = true; // updatePointer() then carries it on the laser
+        mChatOnly = false;
+    }
+    if (mPanelVisible)
+    {
+        mUnread = false;
     }
 
     // Left stick walks and strafes, like the arrow keys. Walking brings a zoomed camera
@@ -858,7 +1096,7 @@ void LLViewerVR::applyInput()
         gAgentCamera.resetView(true, false, false);
     }
 
-    // Left trigger, while the left laser is on the on-screen keyboard, types the key there.
+    // Left trigger, while the left laser is on the on-screen keyboard, works it like the right.
     // Otherwise it is the Alt key of the mouse camera: pressing it while the laser is on an
     // object or avatar makes that the camera's focus, and while it is held the right stick
     // zooms and orbits. The view stays there (showing the own avatar) until the avatar walks.
@@ -867,18 +1105,25 @@ void LLViewerVR::applyInput()
     if (input.zoom != mZoomDown)
     {
         mZoomDown = input.zoom;
-        mZoomOnKeyboard = input.zoom && mLeftHoverRow >= 0; // its release goes nowhere either
+        if (input.zoom)
+        {
+            mZoomOnKeyboard = mKeyboardHit[1].part != LLVRKeyboard::NONE;
+        }
         if (mZoomOnKeyboard)
         {
-            pressKey(keyAt(mLeftHoverColumn, mLeftHoverRow, mShift));
+            input.zoom ? pressKeyboard(1) : releaseKeyboard(1);
         }
         else if (input.zoom && mWorldHit && (mWorldHitPos - mBaseOrigin).length() > 0.5f)
         {
-            mZoomYawOffset = 0.f; // the view turns to the new focus
+            // The camera turns to the new focus; turn the tracking space back by as much, so
+            // that the view stays where the user was looking (it used to jump).
+            const LLVector3 to_hit = mWorldHitPos - mBaseOrigin;
+            mZoomYawOffset = fabsf(to_hit.mV[VX]) + fabsf(to_hit.mV[VY]) > 0.1f
+                ? atan2f(mBaseYawSin, mBaseYawCos) - atan2f(to_hit.mV[VY], to_hit.mV[VX]) : 0.f;
             gAgentCamera.setFocusOnAvatar(false, false);
             gAgentCamera.setCameraPosAndFocusGlobal(gAgent.getPosGlobalFromAgent(mBaseOrigin),
                                                     gAgent.getPosGlobalFromAgent(mWorldHitPos), LLUUID::null);
-            gAgentCamera.setCameraAnimating(false); // no glide: the view just turns to the new focus
+            gAgentCamera.setCameraAnimating(false); // no glide
         }
     }
 
@@ -886,8 +1131,8 @@ void LLViewerVR::applyInput()
     // and crouch/fly down like Page Up and Page Down, and held up it starts flying.
     const F32 x = input.turn[0], y = input.turn[1];
     const bool zooming = input.zoom && !mZoomOnKeyboard && !gAgentCamera.getFocusOnAvatar();
-    const bool stick_free = !input.grab && !zooming;
-    if (zooming && !input.grab && fabsf(x) < STICK_OFF && mWorldHit)
+    const bool stick_free = !mGrabbing && !zooming && mDragHand < 0;
+    if (zooming && !mGrabbing && fabsf(x) < STICK_OFF && mWorldHit)
     {
         // While held, the focus follows the laser: zoom in to the top of a tree after pressing
         // at its foot. Not while orbiting, where the laser sweeps past the focus. The camera
@@ -905,7 +1150,7 @@ void LLViewerVR::applyInput()
             gAgentCamera.setCameraAnimating(false);
         }
     }
-    if (zooming && !input.grab)
+    if (zooming && !mGrabbing)
     {
         const F32 step = ZOOM_RATE * llmin((F32)gFrameIntervalSeconds, 0.1f);
         if (fabsf(y) > STICK_OFF)
@@ -955,8 +1200,8 @@ void LLViewerVR::applyInput()
     LLWindow* window = gViewerWindow->getWindow();
     const MASK mask = gKeyboard ? gKeyboard->currentMask(true) : MASK_NONE;
     const LLCoordGL pointer(mPointerX, mPointerY);
-    const bool on_keyboard = mHoverRow >= 0;
-    const bool on_panel = mInput.aim_valid && mPanelHit && !on_keyboard;
+    const bool on_keyboard = mKeyboardHit[0].part != LLVRKeyboard::NONE;
+    const bool on_panel = mInput.aim_valid && mPanelHit;
     static S32 sLastX = -1, sLastY = -1;
     if (on_panel && (mPointerX != sLastX || mPointerY != sLastY))
     {
@@ -977,10 +1222,7 @@ void LLViewerVR::applyInput()
         }
         if (mTriggerOnKeyboard)
         {
-            if (input.trigger)
-            {
-                pressKey(keyAt(mHoverColumn, mHoverRow, mShift));
-            }
+            input.trigger ? pressKeyboard(0) : releaseKeyboard(0);
         }
         else if (!mTriggerOnPanel)
         {
@@ -1014,7 +1256,8 @@ void LLViewerVR::applyInput()
         mGripDown = input.grip;
         if (input.grip)
         {
-            mGripOnPanel = mInput.aim_valid && mPanelHit; // over the keyboard too: nothing behind it to click
+            mGripOnKeyboard = on_keyboard; // nothing to click there
+            mGripOnPanel = on_panel;
             mPanelVisible = true; // the context menu opens on the panel
         }
         if (mGripOnPanel)
@@ -1022,9 +1265,16 @@ void LLViewerVR::applyInput()
             input.grip ? gViewerWindow->handleRightMouseDown(window, pointer, mask)
                        : gViewerWindow->handleRightMouseUp(window, pointer, mask);
         }
-        else if (LLTool* tool = LLToolMgr::getInstance()->getCurrentTool())
+        else if (LLTool* tool = mGripOnKeyboard ? nullptr : LLToolMgr::getInstance()->getCurrentTool())
         {
             input.grip ? tool->handleRightMouseDown(mouse_x, mouse_y, mask) : tool->handleRightMouseUp(mouse_x, mouse_y, mask);
         }
+    }
+
+    // Backspace held down repeats, as on a real keyboard.
+    if (mRepeatHand >= 0 && mRepeatTimer.getElapsedTimeF32() > mRepeatNext)
+    {
+        mKeyboard.press(mRepeatHit);
+        mRepeatNext += KEY_REPEAT_INTERVAL;
     }
 }

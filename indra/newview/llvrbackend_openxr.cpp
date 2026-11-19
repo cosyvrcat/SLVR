@@ -45,7 +45,7 @@ namespace
     XrSpace sSpace = XR_NULL_HANDLE;
     XrEnvironmentBlendMode sBlendMode = XR_ENVIRONMENT_BLEND_MODE_OPAQUE;
     EyeTarget sTargets[2];
-    EyeTarget sUITarget;      // the flat UI, shown as a quad layer; created on first use
+    EyeTarget sUITargets[LLVRBackend::UI_LAYERS]; // quad layers (flat UI, keyboard); created on first use
     int64_t sFormat = 0;
     GLuint sFBO = 0;
 
@@ -58,7 +58,7 @@ namespace
     XrAction sMenuAction = XR_NULL_HANDLE;
     XrAction sZoomAction = XR_NULL_HANDLE;
     XrAction sGrabAction = XR_NULL_HANDLE;
-    GLuint sUIDepth = 0;      // depth buffer for the UI image (HUD attachments need one)
+    GLuint sUIDepth[LLVRBackend::UI_LAYERS] = {}; // depth buffers for the quad images (HUD attachments need one)
     XrAction sAimAction = XR_NULL_HANDLE;
     XrSpace sAimSpace = XR_NULL_HANDLE;
     XrAction sLeftAimAction = XR_NULL_HANDLE;
@@ -68,9 +68,9 @@ namespace
     bool sRunning = false;    // between xrBeginSession and xrEndSession
     bool sFrameBegun = false; // xrBeginFrame was called and xrEndFrame is owed
     bool sEyeDone[2] = { false, false };
-    bool sUIBegun = false;    // beginUI() left the UI image acquired and bound
-    bool sUIDone = false;     // sUILayer is filled in for this frame
-    XrCompositionLayerQuad sUILayer;
+    int sUIBegun = -1;        // layer whose image beginUI() left acquired and bound, or -1
+    bool sUIDone[LLVRBackend::UI_LAYERS] = {}; // sUILayers[i] is filled in for this frame
+    XrCompositionLayerQuad sUILayers[LLVRBackend::UI_LAYERS];
     XrViewStateFlags sViewStateFlags = 0;
     LLVRInput sLastInput;     // for the periodic log line
     XrTime sDisplayTime = 0;
@@ -615,7 +615,7 @@ void LLVRBackend::shutdown()
         return;
     }
     // Children are destroyed with their parent, but destroy in order so failures are logged.
-    if (sUIBegun)
+    if (sUIBegun >= 0)
     {
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
@@ -623,11 +623,14 @@ void LLVRBackend::shutdown()
     {
         destroyTarget(target);
     }
-    destroyTarget(sUITarget);
-    if (sUIDepth)
+    for (int layer = 0; layer < UI_LAYERS; ++layer)
     {
-        glDeleteRenderbuffers(1, &sUIDepth);
-        sUIDepth = 0;
+        destroyTarget(sUITargets[layer]);
+        if (sUIDepth[layer])
+        {
+            glDeleteRenderbuffers(1, &sUIDepth[layer]);
+            sUIDepth[layer] = 0;
+        }
     }
     if (sAimSpace != XR_NULL_HANDLE)
     {
@@ -662,7 +665,9 @@ void LLVRBackend::shutdown()
     xrDestroyInstance(sInstance);
     sInstance = XR_NULL_HANDLE;
     sSystemId = XR_NULL_SYSTEM_ID;
-    sAlive = sRunning = sFrameBegun = sUIBegun = sUIDone = false;
+    sAlive = sRunning = sFrameBegun = false;
+    sUIBegun = -1;
+    std::fill(std::begin(sUIDone), std::end(sUIDone), false);
     LL_INFOS("VR") << "OpenXR shut down" << LL_ENDL;
 }
 
@@ -696,7 +701,7 @@ bool LLVRBackend::beginFrame(LLVREye eyes[2])
     sFrameBegun = true;
     sDisplayTime = frame_state.predictedDisplayTime;
     sEyeDone[0] = sEyeDone[1] = false;
-    sUIDone = false;
+    std::fill(std::begin(sUIDone), std::end(sUIDone), false);
     if (!frame_state.shouldRender)
     {
         return false; // endFrame() will submit no layers
@@ -764,91 +769,95 @@ bool LLVRBackend::getInput(LLVRInput& input)
     return true;
 }
 
-bool LLVRBackend::beginUI(int width, int height)
+bool LLVRBackend::beginUI(int layer, int width, int height)
 {
-    if (!sFrameBegun || sUIBegun || width <= 0 || height <= 0)
+    if (!sFrameBegun || sUIBegun >= 0 || layer < 0 || layer >= UI_LAYERS || width <= 0 || height <= 0)
     {
         return false;
     }
-    // The image is as large as the window so the UI is copied 1:1; recreate it on a resize.
-    if (sUITarget.width != width || sUITarget.height != height)
+    EyeTarget& target = sUITargets[layer];
+    // The panel image is as large as the window so the UI is copied 1:1; recreate it on a resize.
+    if (target.width != width || target.height != height)
     {
-        destroyTarget(sUITarget);
-        if (!createTarget(sUITarget, (uint32_t)width, (uint32_t)height))
+        destroyTarget(target);
+        if (!createTarget(target, (uint32_t)width, (uint32_t)height))
         {
-            destroyTarget(sUITarget);
+            destroyTarget(target);
             return false;
         }
-        if (!sUIDepth)
+        if (!sUIDepth[layer])
         {
-            glGenRenderbuffers(1, &sUIDepth);
+            glGenRenderbuffers(1, &sUIDepth[layer]);
         }
-        glBindRenderbuffer(GL_RENDERBUFFER, sUIDepth);
+        glBindRenderbuffer(GL_RENDERBUFFER, sUIDepth[layer]);
         glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, width, height);
         glBindRenderbuffer(GL_RENDERBUFFER, 0);
-        LL_INFOS("VR") << "UI panel image: " << width << "x" << height << ", "
-                       << sUITarget.images.size() << " images" << LL_ENDL;
+        LL_INFOS("VR") << "Quad layer " << layer << " image: " << width << "x" << height << ", "
+                       << target.images.size() << " images" << LL_ENDL;
     }
 
     uint32_t index = 0;
-    if (!xrOk(xrAcquireSwapchainImage(sUITarget.swapchain, nullptr, &index), "xrAcquireSwapchainImage(UI)"))
+    if (!xrOk(xrAcquireSwapchainImage(target.swapchain, nullptr, &index), "xrAcquireSwapchainImage(UI)"))
     {
         return false;
     }
     XrSwapchainImageWaitInfo wait_info{ XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO };
     wait_info.timeout = XR_INFINITE_DURATION;
-    if (!xrOk(xrWaitSwapchainImage(sUITarget.swapchain, &wait_info), "xrWaitSwapchainImage(UI)"))
+    if (!xrOk(xrWaitSwapchainImage(target.swapchain, &wait_info), "xrWaitSwapchainImage(UI)"))
     {
         return false; // nothing to release: the spec only allows a release after a successful wait
     }
     GLenum status = GL_FRAMEBUFFER_UNSUPPORTED;
-    if (index < sUITarget.images.size())
+    if (index < target.images.size())
     {
         glBindFramebuffer(GL_FRAMEBUFFER, sFBO);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, sUITarget.images[index].image, 0);
-        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, sUIDepth);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, target.images[index].image, 0);
+        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, sUIDepth[layer]);
         status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
     }
     if (status != GL_FRAMEBUFFER_COMPLETE)
     {
         LL_WARNS_ONCE("VR") << llformat("UI framebuffer incomplete: 0x%04X", status) << LL_ENDL;
-        if (index < sUITarget.images.size())
+        if (index < target.images.size())
         {
             glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, 0);
         }
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        xrOk(xrReleaseSwapchainImage(sUITarget.swapchain, nullptr), "xrReleaseSwapchainImage(UI)");
+        xrOk(xrReleaseSwapchainImage(target.swapchain, nullptr), "xrReleaseSwapchainImage(UI)");
         return false;
     }
-    sUIBegun = true;
+    sUIBegun = layer;
     return true;
 }
 
 void LLVRBackend::endUI(const float centre[3], const float rot[4], float width_m, float height_m)
 {
-    if (!sUIBegun)
+    if (sUIBegun < 0)
     {
         return;
     }
-    sUIBegun = false;
+    const int layer = sUIBegun;
+    sUIBegun = -1;
+    EyeTarget& target = sUITargets[layer];
     // The framebuffer object is shared with the eye copies, which have no use for the depth buffer.
     glBindFramebuffer(GL_FRAMEBUFFER, sFBO); // the drawing in between may have gone back to the window's
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, 0);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    if (!xrOk(xrReleaseSwapchainImage(sUITarget.swapchain, nullptr), "xrReleaseSwapchainImage(UI)"))
+    if (!xrOk(xrReleaseSwapchainImage(target.swapchain, nullptr), "xrReleaseSwapchainImage(UI)"))
     {
         return;
     }
-    sUILayer = { XR_TYPE_COMPOSITION_LAYER_QUAD };
-    sUILayer.layerFlags = XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT; // colour is premultiplied
-    sUILayer.space = sSpace;
-    sUILayer.eyeVisibility = XR_EYE_VISIBILITY_BOTH;
-    sUILayer.subImage.swapchain = sUITarget.swapchain;
-    sUILayer.subImage.imageRect.extent = { sUITarget.width, sUITarget.height };
-    sUILayer.pose.orientation = { rot[0], rot[1], rot[2], rot[3] };
-    sUILayer.pose.position = { centre[0], centre[1], centre[2] };
-    sUILayer.size = { width_m, height_m };
-    sUIDone = true;
+    XrCompositionLayerQuad& quad = sUILayers[layer];
+    quad = { XR_TYPE_COMPOSITION_LAYER_QUAD };
+    quad.layerFlags = XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT; // colour is premultiplied
+    quad.space = sSpace;
+    quad.eyeVisibility = XR_EYE_VISIBILITY_BOTH;
+    quad.subImage.swapchain = target.swapchain;
+    quad.subImage.imageRect.extent = { target.width, target.height };
+    quad.pose.orientation = { rot[0], rot[1], rot[2], rot[3] };
+    quad.pose.position = { centre[0], centre[1], centre[2] };
+    quad.size = { width_m, height_m };
+    sUIDone[layer] = true;
 }
 
 bool LLVRBackend::submitEye(int eye, int x, int y, int width, int height)
@@ -927,25 +936,29 @@ void LLVRBackend::endFrame()
     layer.viewCount = 2;
     layer.views = sLayerViews;
 
-    if (sUIBegun)
+    if (sUIBegun >= 0)
     {
         // The caller never reached endUI(); give the image back so the swapchain is not left acquired.
-        sUIBegun = false;
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        xrOk(xrReleaseSwapchainImage(sUITarget.swapchain, nullptr), "xrReleaseSwapchainImage(UI, abandoned)");
+        xrOk(xrReleaseSwapchainImage(sUITargets[sUIBegun].swapchain, nullptr), "xrReleaseSwapchainImage(UI, abandoned)");
+        sUIBegun = -1;
     }
 
     // Without both eyes (runtime said not to render, or a copy failed) submit an empty frame.
-    // The UI panel is drawn over the scene, so it only goes out together with the scene.
+    // The quads are drawn over the scene, so they only go out together with the scene, in
+    // layer order (the keyboard over the panel).
     const bool stereo = sEyeDone[0] && sEyeDone[1];
-    const XrCompositionLayerBaseHeader* layers[2];
+    const XrCompositionLayerBaseHeader* layers[1 + UI_LAYERS];
     uint32_t layer_count = 0;
     if (stereo)
     {
         layers[layer_count++] = reinterpret_cast<XrCompositionLayerBaseHeader*>(&layer);
-        if (sUIDone)
+        for (int i = 0; i < UI_LAYERS; ++i)
         {
-            layers[layer_count++] = reinterpret_cast<XrCompositionLayerBaseHeader*>(&sUILayer);
+            if (sUIDone[i])
+            {
+                layers[layer_count++] = reinterpret_cast<XrCompositionLayerBaseHeader*>(&sUILayers[i]);
+            }
         }
     }
     XrFrameEndInfo end_info{ XR_TYPE_FRAME_END_INFO };
