@@ -185,6 +185,8 @@
 #include "llvovolume.h"
 #include "particleeditor.h"
 #include "permissionstracker.h"
+#include "llviewerVR.h"
+#include "llvrlanguage.h"
 
 using namespace LLAvatarAppearanceDefines;
 
@@ -739,6 +741,7 @@ void init_menus()
     // </FS> Changed for grid manager
 
     menu_bar_holder->addChild(gMenuBarView);
+    LLVRLanguage::init(); // SLVR: the SLVR menu in the SLVR language
 
     gViewerWindow->setMenuBackgroundColor(false,
         !LLGridManager::getInstance()->isInSLBeta());
@@ -13005,6 +13008,8 @@ void initialize_menus()
 
     LLUICtrl::EnableCallbackRegistry::Registrar& enable = LLUICtrl::EnableCallbackRegistry::currentRegistrar();
     LLUICtrl::CommitCallbackRegistry::Registrar& commit = LLUICtrl::CommitCallbackRegistry::currentRegistrar();
+
+    commit.add("SLVR.Screenshot", [](LLUICtrl*, const LLSD&) { gVR.requestScreenshot(); });
 
     // Generic enable and visible
     // Don't prepend MenuName.Foo because these can be used in any menu.

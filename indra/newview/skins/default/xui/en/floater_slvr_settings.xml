@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes" ?>
+<!-- SLVR: labels are put into the SLVR language by llvrlanguage.cpp; these are the fallback. -->
+<floater
+ legacy_header_height="18"
+ can_resize="false"
+ height="128"
+ layout="topleft"
+ name="slvr_settings"
+ single_instance="true"
+ save_rect="true"
+ title="SLVR Settings"
+ width="420">
+    <text
+     follows="left|top"
+     height="16"
+     layout="topleft"
+     left="12"
+     name="language_label"
+     top="32"
+     width="170">
+        SLVR language:
+    </text>
+    <combo_box
+     follows="left|top"
+     height="23"
+     layout="topleft"
+     left="185"
+     name="language"
+     top="28"
+     width="220" />
+    <text
+     follows="left|top"
+     height="16"
+     layout="topleft"
+     left="12"
+     name="keyboard_label"
+     top="64"
+     width="170">
+        Keyboard layout:
+    </text>
+    <combo_box
+     follows="left|top"
+     height="23"
+     layout="topleft"
+     left="185"
+     name="keyboard_layout"
+     top="60"
+     width="220" />
+    <check_box
+     control_name="SLVRWordSuggestions"
+     follows="left|top"
+     height="16"
+     label="Word suggestions and next-word prediction"
+     layout="topleft"
+     left="12"
+     name="word_suggestions"
+     top="98"
+     width="395" />
+</floater>

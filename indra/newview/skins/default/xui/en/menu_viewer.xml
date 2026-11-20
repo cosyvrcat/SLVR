@@ -1028,15 +1028,6 @@
      name="World"
      tear_off="true"
      visible="true">
-        <menu_item_check
-         label="VR Headset (Ctrl+Alt+F7)"
-         name="SLVR VR Headset">
-            <menu_item_check.on_check
-             control="VREnabled" />
-            <menu_item_check.on_click
-             function="ToggleControl"
-             parameter="VREnabled" />
-        </menu_item_check>
         <menu_item_call
          label="Resync Animations"
          name="Resync Animations"
@@ -2910,6 +2901,41 @@
             <menu_item_call.on_click
              function="Floater.Show"
              parameter="sl_about" />
+        </menu_item_call>
+    </menu>
+    
+    <!-- SLVR: labels are put into the SLVR language by llvrlanguage.cpp; these are the fallback. -->
+    <menu
+     create_jump_keys="true"
+     label="SLVR"
+     name="SLVR"
+     tear_off="true"
+     visible="true">
+        <menu_item_check
+         label="VR Headset (Ctrl+Alt+F7)"
+         name="SLVR VR Headset">
+            <menu_item_check.on_check
+             control="VREnabled" />
+            <menu_item_check.on_click
+             function="ToggleControl"
+             parameter="VREnabled" />
+        </menu_item_check>
+        <menu_item_call
+         label="Take VR Screenshot (Y)"
+         name="SLVR Screenshot">
+            <menu_item_call.on_click
+             function="SLVR.Screenshot" />
+            <menu_item_call.on_enable
+             function="CheckControl"
+             parameter="VREnabled" />
+        </menu_item_call>
+        <menu_item_separator />
+        <menu_item_call
+         label="SLVR Settings..."
+         name="SLVR Settings">
+            <menu_item_call.on_click
+             function="Floater.Show"
+             parameter="slvr_settings" />
         </menu_item_call>
     </menu>
     

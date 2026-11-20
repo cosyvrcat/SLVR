@@ -12,6 +12,7 @@
 #define LL_LLVRBACKEND_H
 
 #include <string>
+#include <vector>
 
 // One eye for the frame being rendered, in the runtime's tracking space:
 // right-handed, +Y up, -Z forward, metres, origin where the headset was at start (seated/LOCAL).
@@ -32,6 +33,7 @@ struct LLVRInput
     bool menu = false;            // left menu button
     bool zoom = false;            // left index trigger
     bool grab = false;            // left grip
+    bool shot = false;            // Y button: screenshot
     bool aim_valid = false;       // right hand is tracked; aim_pos/aim_rot are usable
     float aim_pos[3] = { 0.f, 0.f, 0.f };     // right-hand pointing pose in tracking space,
     float aim_rot[4] = { 0.f, 0.f, 0.f, 1.f }; // pointing along its -Z
@@ -74,6 +76,10 @@ public:
     enum { UI_PANEL = 0, UI_KEYBOARD = 1, UI_LAYERS = 2 };
     bool beginUI(int layer, int width, int height);
     void endUI(const float centre[3], const float rot[4], float width_m, float height_m);
+
+    // Between beginUI() and endUI(): the layer's image as drawn so far, for a screenshot.
+    // RGBA (premultiplied), bottom row first.
+    bool readUI(std::vector<unsigned char>& rgba, int& width, int& height);
 
     // Hands the frame to the runtime. Safe to call when no frame was begun.
     void endFrame();

@@ -58,6 +58,7 @@ namespace
     XrAction sMenuAction = XR_NULL_HANDLE;
     XrAction sZoomAction = XR_NULL_HANDLE;
     XrAction sGrabAction = XR_NULL_HANDLE;
+    XrAction sShotAction = XR_NULL_HANDLE;
     GLuint sUIDepth[LLVRBackend::UI_LAYERS] = {}; // depth buffers for the quad images (HUD attachments need one)
     XrAction sAimAction = XR_NULL_HANDLE;
     XrSpace sAimSpace = XR_NULL_HANDLE;
@@ -277,6 +278,7 @@ namespace
             { &sMenuAction, XR_ACTION_TYPE_BOOLEAN_INPUT, "panel", "Show or hide the UI panel", "/user/hand/left/input/menu/click" },
             { &sZoomAction, XR_ACTION_TYPE_BOOLEAN_INPUT, "zoom", "Zoom the camera to a point", "/user/hand/left/input/trigger/value" },
             { &sGrabAction, XR_ACTION_TYPE_BOOLEAN_INPUT, "grab", "Move the UI panel", "/user/hand/left/input/squeeze/value" },
+            { &sShotAction, XR_ACTION_TYPE_BOOLEAN_INPUT, "screenshot", "Take a screenshot", "/user/hand/left/input/y/click" },
             { &sAimAction, XR_ACTION_TYPE_POSE_INPUT, "aim", "Pointer", "/user/hand/right/input/aim/pose" },
             { &sLeftAimAction, XR_ACTION_TYPE_POSE_INPUT, "aim_left", "Left pointer (on-screen keyboard)", "/user/hand/left/input/aim/pose" },
         };
@@ -762,6 +764,7 @@ bool LLVRBackend::getInput(LLVRInput& input)
     input.menu = readBoolean(sMenuAction, "xrGetActionStateBoolean(panel)");
     input.zoom = readBoolean(sZoomAction, "xrGetActionStateBoolean(zoom)");
     input.grab = readBoolean(sGrabAction, "xrGetActionStateBoolean(grab)");
+    input.shot = readBoolean(sShotAction, "xrGetActionStateBoolean(screenshot)");
 
     input.aim_valid = locateAim(sAimSpace, "xrLocateSpace(aim)", input.aim_pos, input.aim_rot);
     input.left_aim_valid = locateAim(sLeftAimSpace, "xrLocateSpace(aim_left)", input.left_aim_pos, input.left_aim_rot);
@@ -858,6 +861,53 @@ void LLVRBackend::endUI(const float centre[3], const float rot[4], float width_m
     quad.pose.position = { centre[0], centre[1], centre[2] };
     quad.size = { width_m, height_m };
     sUIDone[layer] = true;
+}
+
+bool LLVRBackend::readUI(std::vector<unsigned char>& rgba, int& width, int& height)
+{
+    if (sUIBegun < 0)
+    {
+        return false;
+    }
+    const EyeTarget& target = sUITargets[sUIBegun];
+    width = target.width;
+    height = target.height;
+    // Through a plain RGBA8 copy: glReadPixels() would decode an sRGB image, while the blit
+    // below copies it raw, as submitEye() does.
+    GLuint copy = 0, fbo = 0;
+    glGenRenderbuffers(1, &copy);
+    glBindRenderbuffer(GL_RENDERBUFFER, copy);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_RGBA8, width, height);
+    glBindRenderbuffer(GL_RENDERBUFFER, 0);
+    glGenFramebuffers(1, &fbo);
+    glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fbo);
+    glFramebufferRenderbuffer(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, copy);
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, sFBO);
+    glReadBuffer(GL_COLOR_ATTACHMENT0);
+    const GLboolean srgb_was_on = glIsEnabled(GL_FRAMEBUFFER_SRGB);
+    const GLboolean scissor_was_on = glIsEnabled(GL_SCISSOR_TEST);
+    glDisable(GL_FRAMEBUFFER_SRGB);
+    glDisable(GL_SCISSOR_TEST);
+    const bool ok = glCheckFramebufferStatus(GL_DRAW_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
+    if (ok)
+    {
+        glBlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+        glBindFramebuffer(GL_READ_FRAMEBUFFER, fbo);
+        glReadBuffer(GL_COLOR_ATTACHMENT0);
+        rgba.resize((size_t)width * height * 4);
+        glPixelStorei(GL_PACK_ALIGNMENT, 1);
+        glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, rgba.data());
+    }
+    if (srgb_was_on) glEnable(GL_FRAMEBUFFER_SRGB);
+    if (scissor_was_on) glEnable(GL_SCISSOR_TEST);
+    glBindFramebuffer(GL_FRAMEBUFFER, sFBO); // back to the layer's image, as beginUI() left it
+    glDeleteFramebuffers(1, &fbo);
+    glDeleteRenderbuffers(1, &copy);
+    if (!ok)
+    {
+        LL_WARNS("VR") << "Screenshot: could not copy quad layer " << sUIBegun << LL_ENDL;
+    }
+    return ok;
 }
 
 bool LLVRBackend::submitEye(int eye, int x, int y, int width, int height)

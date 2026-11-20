@@ -1,0 +1,308 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<!-- SLVR: languages of the SLVR menu, settings and messages, and the on-screen keyboard layouts.
+     keyboard: three rows of letters; the keys around them are added by the keyboard. A language
+     without one types with the English layout (Japanese and Chinese need an IME). -->
+<llsd>
+<array>
+  <map>
+    <key>code</key><string>en</string>
+    <key>name</key><string>English</string>
+    <key>keyboard</key>
+    <array>
+      <string>qwertyuiop</string>
+      <string>asdfghjkl</string>
+      <string>zxcvbnm</string>
+    </array>
+    <key>strings</key>
+    <map>
+      <key>SLVR VR Headset</key><string>VR Headset (Ctrl+Alt+F7)</string>
+      <key>SLVR Screenshot</key><string>Take VR Screenshot (Y)</string>
+      <key>SLVR Settings</key><string>SLVR Settings...</string>
+      <key>settings_title</key><string>SLVR Settings</string>
+      <key>language_label</key><string>SLVR language:</string>
+      <key>keyboard_label</key><string>Keyboard layout:</string>
+      <key>word_suggestions</key><string>Word suggestions and next-word prediction</string>
+      <key>same_as_viewer</key><string>Same as Firestorm</string>
+      <key>same_as_language</key><string>Same as SLVR language</string>
+      <key>screenshot_saved</key><string>VR screenshot saved: [PATH]</string>
+      <key>screenshot_failed</key><string>VR screenshot could not be saved: [PATH]</string>
+    </map>
+  </map>
+  <map>
+    <key>code</key><string>tr</string>
+    <key>name</key><string>Türkçe</string>
+    <key>keyboard</key>
+    <array>
+      <string>qwertyuıopğü</string>
+      <string>asdfghjklşi</string>
+      <string>zxcvbnmöç</string>
+    </array>
+    <key>strings</key>
+    <map>
+      <key>SLVR VR Headset</key><string>VR Gözlüğü (Ctrl+Alt+F7)</string>
+      <key>SLVR Screenshot</key><string>VR Ekran Görüntüsü Al (Y)</string>
+      <key>SLVR Settings</key><string>SLVR Ayarları...</string>
+      <key>settings_title</key><string>SLVR Ayarları</string>
+      <key>language_label</key><string>SLVR dili:</string>
+      <key>keyboard_label</key><string>Klavye düzeni:</string>
+      <key>word_suggestions</key><string>Kelime önerileri ve sonraki kelime tahmini</string>
+      <key>same_as_viewer</key><string>Firestorm ile aynı</string>
+      <key>same_as_language</key><string>SLVR diliyle aynı</string>
+      <key>screenshot_saved</key><string>VR ekran görüntüsü kaydedildi: [PATH]</string>
+      <key>screenshot_failed</key><string>VR ekran görüntüsü kaydedilemedi: [PATH]</string>
+    </map>
+  </map>
+  <map>
+    <key>code</key><string>az</string>
+    <key>name</key><string>Azərbaycanca</string>
+    <key>keyboard</key>
+    <array>
+      <string>qüertyuiopöğ</string>
+      <string>asdfghjklıə</string>
+      <string>zxcvbnmçş</string>
+    </array>
+    <key>strings</key>
+    <map>
+      <key>SLVR VR Headset</key><string>VR eynəyi (Ctrl+Alt+F7)</string>
+      <key>SLVR Screenshot</key><string>VR ekran şəkli çək (Y)</string>
+      <key>SLVR Settings</key><string>SLVR parametrləri...</string>
+      <key>settings_title</key><string>SLVR parametrləri</string>
+      <key>language_label</key><string>SLVR dili:</string>
+      <key>keyboard_label</key><string>Klaviatura düzümü:</string>
+      <key>word_suggestions</key><string>Söz təklifləri və növbəti söz proqnozu</string>
+      <key>same_as_viewer</key><string>Firestorm ilə eyni</string>
+      <key>same_as_language</key><string>SLVR dili ilə eyni</string>
+      <key>screenshot_saved</key><string>VR ekran şəkli saxlanıldı: [PATH]</string>
+      <key>screenshot_failed</key><string>VR ekran şəkli saxlanıla bilmədi: [PATH]</string>
+    </map>
+  </map>
+  <map>
+    <key>code</key><string>da</string>
+    <key>name</key><string>Dansk</string>
+    <key>keyboard</key>
+    <array>
+      <string>qwertyuiopå</string>
+      <string>asdfghjklæø</string>
+      <string>zxcvbnm</string>
+    </array>
+    <key>strings</key>
+    <map>
+      <key>SLVR VR Headset</key><string>VR-headset (Ctrl+Alt+F7)</string>
+      <key>SLVR Screenshot</key><string>Tag VR-skærmbillede (Y)</string>
+      <key>SLVR Settings</key><string>SLVR-indstillinger...</string>
+      <key>settings_title</key><string>SLVR-indstillinger</string>
+      <key>language_label</key><string>SLVR-sprog:</string>
+      <key>keyboard_label</key><string>Tastaturlayout:</string>
+      <key>word_suggestions</key><string>Ordforslag og forudsigelse af næste ord</string>
+      <key>same_as_viewer</key><string>Samme som Firestorm</string>
+      <key>same_as_language</key><string>Samme som SLVR-sprog</string>
+      <key>screenshot_saved</key><string>VR-skærmbillede gemt: [PATH]</string>
+      <key>screenshot_failed</key><string>VR-skærmbillede kunne ikke gemmes: [PATH]</string>
+    </map>
+  </map>
+  <map>
+    <key>code</key><string>de</string>
+    <key>name</key><string>Deutsch</string>
+    <key>keyboard</key>
+    <array>
+      <string>qwertzuiopüß</string>
+      <string>asdfghjklöä</string>
+      <string>yxcvbnm</string>
+    </array>
+    <key>strings</key>
+    <map>
+      <key>SLVR VR Headset</key><string>VR-Headset (Strg+Alt+F7)</string>
+      <key>SLVR Screenshot</key><string>VR-Screenshot aufnehmen (Y)</string>
+      <key>SLVR Settings</key><string>SLVR-Einstellungen...</string>
+      <key>settings_title</key><string>SLVR-Einstellungen</string>
+      <key>language_label</key><string>SLVR-Sprache:</string>
+      <key>keyboard_label</key><string>Tastaturlayout:</string>
+      <key>word_suggestions</key><string>Wortvorschläge und Vorhersage des nächsten Worts</string>
+      <key>same_as_viewer</key><string>Wie Firestorm</string>
+      <key>same_as_language</key><string>Wie SLVR-Sprache</string>
+      <key>screenshot_saved</key><string>VR-Screenshot gespeichert: [PATH]</string>
+      <key>screenshot_failed</key><string>VR-Screenshot konnte nicht gespeichert werden: [PATH]</string>
+    </map>
+  </map>
+  <map>
+    <key>code</key><string>es</string>
+    <key>name</key><string>Español</string>
+    <key>keyboard</key>
+    <array>
+      <string>qwertyuiop</string>
+      <string>asdfghjklñ</string>
+      <string>zxcvbnm</string>
+    </array>
+    <key>strings</key>
+    <map>
+      <key>SLVR VR Headset</key><string>Visor VR (Ctrl+Alt+F7)</string>
+      <key>SLVR Screenshot</key><string>Hacer captura VR (Y)</string>
+      <key>SLVR Settings</key><string>Ajustes de SLVR...</string>
+      <key>settings_title</key><string>Ajustes de SLVR</string>
+      <key>language_label</key><string>Idioma de SLVR:</string>
+      <key>keyboard_label</key><string>Distribución del teclado:</string>
+      <key>word_suggestions</key><string>Sugerencias de palabras y predicción de la siguiente</string>
+      <key>same_as_viewer</key><string>Igual que Firestorm</string>
+      <key>same_as_language</key><string>Igual que el idioma de SLVR</string>
+      <key>screenshot_saved</key><string>Captura VR guardada: [PATH]</string>
+      <key>screenshot_failed</key><string>No se pudo guardar la captura VR: [PATH]</string>
+    </map>
+  </map>
+  <map>
+    <key>code</key><string>fr</string>
+    <key>name</key><string>Français</string>
+    <key>keyboard</key>
+    <array>
+      <string>azertyuiop</string>
+      <string>qsdfghjklm</string>
+      <string>wxcvbnéèàç</string>
+    </array>
+    <key>strings</key>
+    <map>
+      <key>SLVR VR Headset</key><string>Casque VR (Ctrl+Alt+F7)</string>
+      <key>SLVR Screenshot</key><string>Capture d'écran VR (Y)</string>
+      <key>SLVR Settings</key><string>Paramètres SLVR...</string>
+      <key>settings_title</key><string>Paramètres SLVR</string>
+      <key>language_label</key><string>Langue de SLVR :</string>
+      <key>keyboard_label</key><string>Disposition du clavier :</string>
+      <key>word_suggestions</key><string>Suggestions de mots et prédiction du mot suivant</string>
+      <key>same_as_viewer</key><string>Comme Firestorm</string>
+      <key>same_as_language</key><string>Comme la langue de SLVR</string>
+      <key>screenshot_saved</key><string>Capture VR enregistrée : [PATH]</string>
+      <key>screenshot_failed</key><string>Impossible d'enregistrer la capture VR : [PATH]</string>
+    </map>
+  </map>
+  <map>
+    <key>code</key><string>it</string>
+    <key>name</key><string>Italiano</string>
+    <key>keyboard</key>
+    <array>
+      <string>qwertyuiopè</string>
+      <string>asdfghjklòàù</string>
+      <string>zxcvbnm</string>
+    </array>
+    <key>strings</key>
+    <map>
+      <key>SLVR VR Headset</key><string>Visore VR (Ctrl+Alt+F7)</string>
+      <key>SLVR Screenshot</key><string>Scatta screenshot VR (Y)</string>
+      <key>SLVR Settings</key><string>Impostazioni SLVR...</string>
+      <key>settings_title</key><string>Impostazioni SLVR</string>
+      <key>language_label</key><string>Lingua di SLVR:</string>
+      <key>keyboard_label</key><string>Layout tastiera:</string>
+      <key>word_suggestions</key><string>Suggerimenti di parole e previsione della successiva</string>
+      <key>same_as_viewer</key><string>Come Firestorm</string>
+      <key>same_as_language</key><string>Come la lingua di SLVR</string>
+      <key>screenshot_saved</key><string>Screenshot VR salvato: [PATH]</string>
+      <key>screenshot_failed</key><string>Impossibile salvare lo screenshot VR: [PATH]</string>
+    </map>
+  </map>
+  <map>
+    <key>code</key><string>pl</string>
+    <key>name</key><string>Polski</string>
+    <key>keyboard</key>
+    <array>
+      <string>qwertyuiopęó</string>
+      <string>asdfghjklłąś</string>
+      <string>zxcvbnmżźćń</string>
+    </array>
+    <key>strings</key>
+    <map>
+      <key>SLVR VR Headset</key><string>Gogle VR (Ctrl+Alt+F7)</string>
+      <key>SLVR Screenshot</key><string>Zrób zrzut ekranu VR (Y)</string>
+      <key>SLVR Settings</key><string>Ustawienia SLVR...</string>
+      <key>settings_title</key><string>Ustawienia SLVR</string>
+      <key>language_label</key><string>Język SLVR:</string>
+      <key>keyboard_label</key><string>Układ klawiatury:</string>
+      <key>word_suggestions</key><string>Podpowiedzi słów i przewidywanie następnego słowa</string>
+      <key>same_as_viewer</key><string>Jak w Firestorm</string>
+      <key>same_as_language</key><string>Jak język SLVR</string>
+      <key>screenshot_saved</key><string>Zapisano zrzut ekranu VR: [PATH]</string>
+      <key>screenshot_failed</key><string>Nie udało się zapisać zrzutu ekranu VR: [PATH]</string>
+    </map>
+  </map>
+  <map>
+    <key>code</key><string>pt</string>
+    <key>name</key><string>Português</string>
+    <key>keyboard</key>
+    <array>
+      <string>qwertyuiop</string>
+      <string>asdfghjklç</string>
+      <string>zxcvbnm</string>
+    </array>
+    <key>strings</key>
+    <map>
+      <key>SLVR VR Headset</key><string>Óculos VR (Ctrl+Alt+F7)</string>
+      <key>SLVR Screenshot</key><string>Capturar tela VR (Y)</string>
+      <key>SLVR Settings</key><string>Configurações do SLVR...</string>
+      <key>settings_title</key><string>Configurações do SLVR</string>
+      <key>language_label</key><string>Idioma do SLVR:</string>
+      <key>keyboard_label</key><string>Layout do teclado:</string>
+      <key>word_suggestions</key><string>Sugestões de palavras e previsão da próxima</string>
+      <key>same_as_viewer</key><string>Igual ao Firestorm</string>
+      <key>same_as_language</key><string>Igual ao idioma do SLVR</string>
+      <key>screenshot_saved</key><string>Captura VR salva: [PATH]</string>
+      <key>screenshot_failed</key><string>Não foi possível salvar a captura VR: [PATH]</string>
+    </map>
+  </map>
+  <map>
+    <key>code</key><string>ru</string>
+    <key>name</key><string>Русский</string>
+    <key>keyboard</key>
+    <array>
+      <string>йцукенгшщзхъ</string>
+      <string>фывапролджэ</string>
+      <string>ячсмитьбюё</string>
+    </array>
+    <key>strings</key>
+    <map>
+      <key>SLVR VR Headset</key><string>VR-шлем (Ctrl+Alt+F7)</string>
+      <key>SLVR Screenshot</key><string>Снимок экрана VR (Y)</string>
+      <key>SLVR Settings</key><string>Настройки SLVR...</string>
+      <key>settings_title</key><string>Настройки SLVR</string>
+      <key>language_label</key><string>Язык SLVR:</string>
+      <key>keyboard_label</key><string>Раскладка клавиатуры:</string>
+      <key>word_suggestions</key><string>Подсказки слов и предсказание следующего слова</string>
+      <key>same_as_viewer</key><string>Как в Firestorm</string>
+      <key>same_as_language</key><string>Как язык SLVR</string>
+      <key>screenshot_saved</key><string>Снимок VR сохранён: [PATH]</string>
+      <key>screenshot_failed</key><string>Не удалось сохранить снимок VR: [PATH]</string>
+    </map>
+  </map>
+  <map>
+    <key>code</key><string>ja</string>
+    <key>name</key><string>日本語</string>
+    <key>strings</key>
+    <map>
+      <key>SLVR VR Headset</key><string>VRヘッドセット (Ctrl+Alt+F7)</string>
+      <key>SLVR Screenshot</key><string>VRスクリーンショットを撮る (Y)</string>
+      <key>SLVR Settings</key><string>SLVR設定...</string>
+      <key>settings_title</key><string>SLVR設定</string>
+      <key>language_label</key><string>SLVRの言語:</string>
+      <key>keyboard_label</key><string>キーボード配列:</string>
+      <key>word_suggestions</key><string>単語の候補と次の単語の予測</string>
+      <key>same_as_viewer</key><string>Firestormと同じ</string>
+      <key>same_as_language</key><string>SLVRの言語と同じ</string>
+      <key>screenshot_saved</key><string>VRスクリーンショットを保存しました: [PATH]</string>
+      <key>screenshot_failed</key><string>VRスクリーンショットを保存できませんでした: [PATH]</string>
+    </map>
+  </map>
+  <map>
+    <key>code</key><string>zh</string>
+    <key>name</key><string>中文</string>
+    <key>strings</key>
+    <map>
+      <key>SLVR VR Headset</key><string>VR头显 (Ctrl+Alt+F7)</string>
+      <key>SLVR Screenshot</key><string>拍摄VR截图 (Y)</string>
+      <key>SLVR Settings</key><string>SLVR设置...</string>
+      <key>settings_title</key><string>SLVR设置</string>
+      <key>language_label</key><string>SLVR语言:</string>
+      <key>keyboard_label</key><string>键盘布局:</string>
+      <key>word_suggestions</key><string>单词建议与下一个词预测</string>
+      <key>same_as_viewer</key><string>与Firestorm相同</string>
+      <key>same_as_language</key><string>与SLVR语言相同</string>
+      <key>screenshot_saved</key><string>VR截图已保存: [PATH]</string>
+      <key>screenshot_failed</key><string>无法保存VR截图: [PATH]</string>
+    </map>
+  </map>
+</array>
+</llsd>

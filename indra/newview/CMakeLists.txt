@@ -857,6 +857,7 @@ set(viewer_SOURCE_FILES
     llviewerVR.cpp
     llvrbackend_openxr.cpp
     llvrkeyboard.cpp
+    llvrlanguage.cpp
     llviewerwearable.cpp
     llviewerwindow.cpp
     llviewerwindowlistener.cpp
@@ -1728,6 +1729,7 @@ set(viewer_HEADER_FILES
     llviewerVR.h
     llvrbackend.h
     llvrkeyboard.h
+    llvrlanguage.h
     llviewerwearable.h
     llviewerwindow.h
     llviewerwindowlistener.h

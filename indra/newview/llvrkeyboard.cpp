@@ -18,48 +18,102 @@
 #include "lllineeditor.h"
 #include "llrender.h"
 #include "lltexteditor.h"
+#include "llviewercontrol.h"
 #include "llviewerwindow.h"
+#include "llvrlanguage.h"
+#include "llwin32headers.h"
 
 #include <algorithm>
+#include <atomic>
 #include <filesystem>
 #include <fstream>
 #include <vector>
 
 namespace
 {
-    enum EAction { TEXT, SPACE, BACKSPACE, ENTER, SHIFT, PAGE, HIDE };
-    struct KeyDef { const char* text; F32 width; EAction action; };
-    struct RowDef { F32 indent; std::vector<KeyDef> keys; };
+    enum EAction { TEXT, SPACE, BACKSPACE, ENTER, SHIFT, PAGE, HIDE, GEAR, GAP };
+    struct KeyDef { std::string text; F32 width; EAction action; };
+    typedef std::vector<std::vector<KeyDef>> rows_t;
 
-    // Turkish Q, laid out like the headset's own keyboard: 13 units a row. Shift turns the
-    // letters upper case; the second page has the digits and symbols. UTF-8 as byte
-    // escapes so the source file's encoding cannot matter.
-    // shortcut: one fixed layout; make it a setting when another language needs typing.
-    const RowDef PAGES[2][4] = {
-        {
-            { 0.f, { { "q", 1, TEXT }, { "w", 1, TEXT }, { "e", 1, TEXT }, { "r", 1, TEXT }, { "t", 1, TEXT }, { "y", 1, TEXT },
-                     { "u", 1, TEXT }, { "\xC4\xB1", 1, TEXT }, { "o", 1, TEXT }, { "p", 1, TEXT }, { "\xC4\x9F", 1, TEXT },
-                     { "\xC3\xBC", 1, TEXT }, { "", 1, BACKSPACE } } },
-            { 0.5f, { { "a", 1, TEXT }, { "s", 1, TEXT }, { "d", 1, TEXT }, { "f", 1, TEXT }, { "g", 1, TEXT }, { "h", 1, TEXT },
-                      { "j", 1, TEXT }, { "k", 1, TEXT }, { "l", 1, TEXT }, { "\xC5\x9F", 1, TEXT }, { "i", 1, TEXT },
-                      { "", 1.5f, ENTER } } },
-            { 0.f, { { "", 2, SHIFT }, { "z", 1, TEXT }, { "x", 1, TEXT }, { "c", 1, TEXT }, { "v", 1, TEXT }, { "b", 1, TEXT },
-                     { "n", 1, TEXT }, { "m", 1, TEXT }, { "\xC3\xB6", 1, TEXT }, { "\xC3\xA7", 1, TEXT }, { ",", 1, TEXT },
-                     { ".", 1, TEXT } } },
-            { 0.f, { { "?123", 2, PAGE }, { ":)", 1, TEXT }, { "", 6, SPACE }, { "?", 1, TEXT }, { "!", 1, TEXT }, { "", 2, HIDE } } },
-        },
-        {
-            { 0.f, { { "1", 1, TEXT }, { "2", 1, TEXT }, { "3", 1, TEXT }, { "4", 1, TEXT }, { "5", 1, TEXT }, { "6", 1, TEXT },
-                     { "7", 1, TEXT }, { "8", 1, TEXT }, { "9", 1, TEXT }, { "0", 1, TEXT }, { "-", 1, TEXT }, { "/", 1, TEXT },
-                     { "", 1, BACKSPACE } } },
-            { 0.5f, { { "@", 1, TEXT }, { "#", 1, TEXT }, { "$", 1, TEXT }, { "&", 1, TEXT }, { "*", 1, TEXT }, { "(", 1, TEXT },
-                      { ")", 1, TEXT }, { "'", 1, TEXT }, { "\"", 1, TEXT }, { "_", 1, TEXT }, { "+", 1, TEXT },
-                      { "", 1.5f, ENTER } } },
-            { 0.f, { { ":(", 2, TEXT }, { "%", 1, TEXT }, { "~", 1, TEXT }, { ":", 1, TEXT }, { ";", 1, TEXT }, { "<", 1, TEXT },
-                     { ">", 1, TEXT }, { "[", 1, TEXT }, { "]", 1, TEXT }, { "=", 1, TEXT }, { "|", 1, TEXT }, { "^", 1, TEXT } } },
-            { 0.f, { { "ABC", 2, PAGE }, { ";)", 1, TEXT }, { "", 6, SPACE }, { ",", 1, TEXT }, { ".", 1, TEXT }, { "", 2, HIDE } } },
-        },
+    // Rows are 13 units wide, laid out like the headset's own keyboard. The letters come
+    // from the layout (see letterRows()); the second page has the digits and symbols.
+    const rows_t SYMBOL_ROWS = {
+        { { "1", 1, TEXT }, { "2", 1, TEXT }, { "3", 1, TEXT }, { "4", 1, TEXT }, { "5", 1, TEXT }, { "6", 1, TEXT },
+          { "7", 1, TEXT }, { "8", 1, TEXT }, { "9", 1, TEXT }, { "0", 1, TEXT }, { "-", 1, TEXT }, { "/", 1, TEXT },
+          { "", 1, BACKSPACE } },
+        { { "", 0.5f, GAP }, { "@", 1, TEXT }, { "#", 1, TEXT }, { "$", 1, TEXT }, { "&", 1, TEXT }, { "*", 1, TEXT },
+          { "(", 1, TEXT }, { ")", 1, TEXT }, { "'", 1, TEXT }, { "\"", 1, TEXT }, { "_", 1, TEXT }, { "+", 1, TEXT },
+          { "", 1.5f, ENTER } },
+        { { ":(", 1, TEXT }, { ";)", 1, TEXT }, { "%", 1, TEXT }, { "~", 1, TEXT }, { ":", 1, TEXT }, { ";", 1, TEXT },
+          { "<", 1, TEXT }, { ">", 1, TEXT }, { "[", 1, TEXT }, { "]", 1, TEXT }, { "=", 1, TEXT }, { "|", 1, TEXT },
+          { "^", 1, TEXT } },
+        { { "ABC", 2, PAGE }, { ":)", 1, TEXT }, { "", 6, SPACE }, { ",", 1, TEXT }, { ".", 1, TEXT }, { "", 2, HIDE } },
     };
+    const std::vector<KeyDef> LETTERS_BOTTOM_ROW = { { "?123", 2, PAGE }, { "", 1, GEAR }, { "", 6, SPACE },
+                                                     { "?", 1, TEXT }, { "!", 1, TEXT }, { "", 2, HIDE } };
+
+    // A layout's three rows of letters with backspace, enter, shift, comma and full stop
+    // around them. Letters are one unit wide, narrower when a row holds too many; what is
+    // left of a row goes to its indent and its keys at the ends.
+    rows_t letterRows(const std::vector<std::string>& layout)
+    {
+        LLWString letters[3];
+        for (size_t row = 0; row < 3 && row < layout.size(); ++row)
+        {
+            letters[row] = utf8str_to_wstring(layout[row]);
+        }
+        const F32 FIXED[3] = { 1.f, 1.5f, 3.5f }; // the narrowest the keys at the ends of each row get
+        F32 unit = 1.f;
+        for (S32 row = 0; row < 3; ++row)
+        {
+            if (!letters[row].empty())
+            {
+                unit = llmin(unit, (13.f - FIXED[row]) / letters[row].size());
+            }
+        }
+        rows_t rows(4);
+        for (S32 row = 0; row < 3; ++row)
+        {
+            const F32 extra = 13.f - FIXED[row] - letters[row].size() * unit;
+            if (row == 2)
+            {
+                rows[row].push_back({ "", 1.5f + extra / 2.f, SHIFT });
+            }
+            else if (extra > 0.f)
+            {
+                rows[row].push_back({ "", extra / 2.f, GAP });
+            }
+            for (llwchar c : letters[row])
+            {
+                rows[row].push_back({ wstring_to_utf8str(LLWString(1, c)), unit, TEXT });
+            }
+            if (row == 0)
+            {
+                rows[row].push_back({ "", 1.f + extra / 2.f, BACKSPACE });
+            }
+            else if (row == 1)
+            {
+                rows[row].push_back({ "", 1.5f + extra / 2.f, ENTER });
+            }
+            else
+            {
+                rows[row].push_back({ ",", 1.f + extra / 4.f, TEXT });
+                rows[row].push_back({ ".", 1.f + extra / 4.f, TEXT });
+            }
+        }
+        rows[3] = LETTERS_BOTTOM_ROW;
+        return rows;
+    }
+
+    F32 rowWidth(const std::vector<KeyDef>& row)
+    {
+        F32 width = 0.f;
+        for (const KeyDef& key : row)
+        {
+            width += key.width;
+        }
+        return width;
+    }
 
     // Image layout, pixels from the bottom left. Keys are UNIT square, rows hang down from
     // KEYS_TOP; the suggestion bar sits above them, the drag handle below the body.
@@ -71,28 +125,50 @@ namespace
     const F32 HANDLE_HALF = 130.f, HANDLE_BOTTOM = LLVRKeyboard::HANDLE_Y - 11.f, HANDLE_TOP = LLVRKeyboard::HANDLE_Y + 11.f, HANDLE_REACH = 220.f;
     const F32 KEY_GAP = 5.f, KEY_RADIUS = 12.f;
 
-    const size_t LOG_BUDGET = 8 << 20; // bytes of chat log read for word completion, newest first
+    const size_t LOG_BUDGET = 8 << 20; // bytes of chat log read for suggestions, newest first
     const U32 TYPED_WEIGHT = 5;        // a word typed here counts as much as this many in the logs
+    const U32 PAIR_WEIGHT = 10;        // and a word seen after the previous one as this many seen anywhere
+    const U32 LOG_PAIR_MIN = 2;        // a pair seen fewer times in the logs is forgotten: most are chance
 
     struct KeyBox { KeyDef def; LLRectf rect; };
 
-    const std::vector<KeyBox>& keyBoxes(S32 page)
+    // The keys as laid out for the current layout; one keyboard is shown at a time.
+    std::vector<KeyBox> sBoxes[2];
+    std::string sLayout;              // the layout sBoxes[0] was built for
+    std::atomic<bool> sTurkic{ false }; // Turkish and Azerbaijani case dotted and dotless i apart
+
+    void layOut(const rows_t& rows, std::vector<KeyBox>& boxes)
     {
-        static std::vector<KeyBox> boxes[2];
-        if (boxes[page].empty())
+        boxes.clear();
+        for (size_t row = 0; row < rows.size(); ++row)
         {
-            for (S32 row = 0; row < 4; ++row)
+            F32 left = MARGIN;
+            const F32 top = KEYS_TOP - row * UNIT;
+            for (const KeyDef& key : rows[row])
             {
-                F32 left = MARGIN + PAGES[page][row].indent * UNIT;
-                const F32 top = KEYS_TOP - row * UNIT;
-                for (const KeyDef& key : PAGES[page][row].keys)
+                if (key.action != GAP)
                 {
-                    boxes[page].push_back({ key, LLRectf(left, top, left + key.width * UNIT, top - UNIT) });
-                    left += key.width * UNIT;
+                    boxes.push_back({ key, LLRectf(left, top, left + key.width * UNIT, top - UNIT) });
                 }
+                left += key.width * UNIT;
             }
         }
-        return boxes[page];
+    }
+
+    const std::vector<KeyBox>& keyBoxes(S32 page)
+    {
+        if (sBoxes[1].empty())
+        {
+            layOut(SYMBOL_ROWS, sBoxes[1]);
+        }
+        const LLVRLanguage::Language& layout = LLVRLanguage::keyboard();
+        if (layout.code != sLayout || sBoxes[0].empty())
+        {
+            sLayout = layout.code;
+            sTurkic = sLayout == "tr" || sLayout == "az";
+            layOut(letterRows(layout.keyboard), sBoxes[0]);
+        }
+        return sBoxes[page];
     }
 
     LLRectf suggestionRect(S32 slot)
@@ -101,29 +177,25 @@ namespace
         return LLRectf(MARGIN + slot * width, SUGGEST_TOP, MARGIN + (slot + 1) * width, SUGGEST_BOTTOM);
     }
 
+    // Letters and case by Windows' own tables, so every layout's letters are known; only
+    // Turkish and Azerbaijani i need their own rule.
     bool isLetter(llwchar c)
     {
-        return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= 0xC0 && c <= 0x24F && c != 0xD7 && c != 0xF7);
+        return c < 0x10000 && IsCharAlphaW((WCHAR)c);
     }
 
-    // Case mapping for the letters this keyboard has (Turkish dotted and dotless i included).
     llwchar lower(llwchar c)
     {
         if (c == 0x130) return 'i';
-        if (c >= 'A' && c <= 'Z') return c + 32;
-        if (c >= 0xC0 && c <= 0xDE && c != 0xD7) return c + 32;
-        if (c >= 0x100 && c <= 0x17F && c != 0x130 && c != 0x131 && !(c & 1)) return c + 1;
-        return c;
+        if (c == 'I' && sTurkic) return 0x131;
+        return c < 0x10000 ? (llwchar)(UINT_PTR)CharLowerW((LPWSTR)(UINT_PTR)c) : c;
     }
 
     llwchar upper(llwchar c)
     {
-        if (c == 'i') return 0x130;
+        if (c == 'i' && sTurkic) return 0x130;
         if (c == 0x131) return 'I';
-        if (c >= 'a' && c <= 'z') return c - 32;
-        if (c >= 0xE0 && c <= 0xFE && c != 0xF7) return c - 32;
-        if (c >= 0x100 && c <= 0x17F && c != 0x131 && (c & 1)) return c - 1;
-        return c;
+        return c < 0x10000 ? (llwchar)(UINT_PTR)CharUpperW((LPWSTR)(UINT_PTR)c) : c;
     }
 
     std::string wordKey(const LLWString& word)
@@ -133,9 +205,11 @@ namespace
         return wstring_to_utf8str(key);
     }
 
-    // Counts the words (letters only, 2 to 24 of them) in a text.
-    void countWords(const LLWString& text, std::map<std::string, U32>& words, U32 weight)
+    // Counts the words (2 to 24 letters) in a text, and which word followed which within a
+    // sentence: across spaces and commas, not across other punctuation.
+    void countText(const LLWString& text, LLVRKeyboard::Learned& learned, U32 weight)
     {
+        std::string previous;
         size_t start = 0;
         for (size_t i = 0; i <= text.size(); ++i)
         {
@@ -143,19 +217,54 @@ namespace
             {
                 continue;
             }
-            if (i - start >= 2 && i - start <= 24)
+            const size_t length = i - start;
+            if (length > 24)
             {
-                words[wordKey(text.substr(start, i - start))] += weight;
+                previous.clear();
+            }
+            else if (length > 0)
+            {
+                const std::string word = wordKey(text.substr(start, length));
+                if (length >= 2)
+                {
+                    learned.words[word] += weight;
+                }
+                if (!previous.empty())
+                {
+                    learned.pairs[previous + ' ' + word] += weight;
+                }
+                previous = word;
+            }
+            if (i < text.size() && text[i] != ' ' && text[i] != ',')
+            {
+                previous.clear();
             }
             start = i + 1;
         }
     }
 
-    // Worker thread: the words of the newest chat logs, up to LOG_BUDGET bytes.
-    std::map<std::string, U32> loadLogWords(std::string dir)
+    // A chat log line's message: "[2026/11/20 21:03]  Name Resident: text" gives "text".
+    LLWString logMessage(const LLWString& line)
+    {
+        size_t start = 0;
+        if (!line.empty() && line[0] == '[')
+        {
+            const size_t close = line.find(']');
+            start = close == LLWString::npos ? 0 : close + 1;
+        }
+        const size_t colon = line.find(':', start);
+        if (colon != LLWString::npos && colon - start < 64) // names are short; a later colon is the message's
+        {
+            start = colon + 1;
+        }
+        return line.substr(start);
+    }
+
+    // Worker thread: what the newest chat logs say, up to LOG_BUDGET bytes.
+    LLVRKeyboard::Learned loadLog(std::string dir)
     {
         namespace fs = std::filesystem;
-        std::map<std::string, U32> words;
+        LLVRKeyboard::Learned learned;
         std::error_code error;
         std::vector<fs::directory_entry> logs;
         for (const fs::directory_entry& entry : fs::directory_iterator(fs::path(ll_convert_string_to_wide(dir)), error))
@@ -174,15 +283,37 @@ namespace
             std::string text(std::min(budget, (size_t)log.file_size(error)), '\0');
             file.read(text.data(), text.size());
             text.resize((size_t)file.gcount());
-            countWords(utf8str_to_wstring(text), words, 1);
             budget -= text.size();
+            size_t line_start = 0;
+            while (line_start < text.size())
+            {
+                size_t line_end = text.find('\n', line_start);
+                line_end = line_end == std::string::npos ? text.size() : line_end;
+                countText(logMessage(utf8str_to_wstring(text.substr(line_start, line_end - line_start))), learned, 1);
+                line_start = line_end + 1;
+            }
             if (budget == 0)
             {
                 break;
             }
         }
-        LL_INFOS("VR") << "Word completion: " << words.size() << " words from " << logs.size() << " chat logs" << LL_ENDL;
-        return words;
+        for (auto it = learned.pairs.begin(); it != learned.pairs.end();)
+        {
+            it = it->second < LOG_PAIR_MIN ? learned.pairs.erase(it) : std::next(it);
+        }
+        LL_INFOS("VR") << "Word suggestions: " << learned.words.size() << " words, " << learned.pairs.size()
+                       << " word pairs from " << logs.size() << " chat logs" << LL_ENDL;
+        return learned;
+    }
+
+    // Calls f(key, count) for the entries of a word map that begin with prefix.
+    template <typename F>
+    void withPrefix(const LLVRKeyboard::word_map_t& words, const std::string& prefix, F f)
+    {
+        for (auto it = words.lower_bound(prefix); it != words.end() && it->first.compare(0, prefix.size(), prefix) == 0; ++it)
+        {
+            f(it->first, it->second);
+        }
     }
 
     // The focused text field's text and cursor; false when the focus is not a text field.
@@ -305,6 +436,28 @@ namespace
         case HIDE:
             stroke({ { cx - s * 0.6f, cy + s * 0.25f }, { cx, cy - s * 0.3f }, { cx + s * 0.6f, cy + s * 0.25f } }, w, color);
             break;
+        case GEAR:
+        {
+            // A gear: eight teeth round a ring.
+            std::vector<LLVector2> outline, hole;
+            const S32 TEETH = 8;
+            for (S32 tooth = 0; tooth < TEETH; ++tooth)
+            {
+                const F32 a = F_TWO_PI * tooth / TEETH;
+                const F32 offsets[4] = { -0.3f, -0.17f, 0.17f, 0.3f }, radii[4] = { 0.62f, 0.9f, 0.9f, 0.62f };
+                for (S32 i = 0; i < 4; ++i)
+                {
+                    outline.emplace_back(cx + s * radii[i] * cosf(a + offsets[i]), cy + s * radii[i] * sinf(a + offsets[i]));
+                }
+            }
+            for (S32 i = 0; i < 16; ++i)
+            {
+                hole.emplace_back(cx + s * 0.28f * cosf(F_TWO_PI * i / 16), cy + s * 0.28f * sinf(F_TWO_PI * i / 16));
+            }
+            stroke(outline, w, color, true);
+            stroke(hole, w, color, true);
+            break;
+        }
         default:
             break;
         }
@@ -424,7 +577,7 @@ void LLVRKeyboard::draw(const Hit hover[2]) const
                 handle_hover ? LLColor4(0.95f, 0.95f, 0.97f, 0.95f) : LLColor4(0.75f, 0.77f, 0.8f, 0.8f));
 }
 
-bool LLVRKeyboard::press(const Hit& hit)
+LLVRKeyboard::EPress LLVRKeyboard::press(const Hit& hit)
 {
     if (hit.part == SUGGESTION && hit.index >= 0 && hit.index < 3 && !mSuggestions[hit.index].empty())
     {
@@ -435,13 +588,19 @@ bool LLVRKeyboard::press(const Hit& hit)
             gViewerWindow->handleKey(KEY_BACKSPACE, MASK_NONE);
         }
         type(word + LLWString(1, ' '));
-        mTypedWords[wordKey(word)] += 1;
-        return false;
+        const std::string key = wordKey(word);
+        mTyped.words[key] += 1;
+        if (!mPrevious.empty())
+        {
+            mTyped.pairs[mPrevious + ' ' + key] += 1;
+        }
+        mShift = mCapsLock;
+        return TYPED;
     }
     const std::vector<KeyBox>& boxes = keyBoxes(mPage);
     if (hit.part != KEY || hit.index < 0 || hit.index >= (S32)boxes.size())
     {
-        return false;
+        return TYPED;
     }
     const KeyDef& key = boxes[hit.index].def;
     switch (key.action)
@@ -455,14 +614,14 @@ bool LLVRKeyboard::press(const Hit& hit)
             mShift = mCapsLock; // shift is for one letter, caps lock stays
         }
         type(text);
-        return false;
+        break;
     }
     case SPACE:
         type(LLWString(1, ' '));
-        return false;
+        break;
     case BACKSPACE:
         gViewerWindow->handleKey(KEY_BACKSPACE, MASK_NONE);
-        return true;
+        return REPEATS;
     case ENTER:
     {
         LLWString text;
@@ -472,7 +631,7 @@ bool LLVRKeyboard::press(const Hit& hit)
             learnText(text, 1); // what the user writes is what they will write again
         }
         gViewerWindow->handleKey(KEY_RETURN, MASK_NONE);
-        return false;
+        break;
     }
     case SHIFT:
         // Once for one capital, twice for caps lock, a third time off.
@@ -488,15 +647,19 @@ bool LLVRKeyboard::press(const Hit& hit)
         {
             mShift = mCapsLock = false;
         }
-        return false;
+        break;
     case PAGE:
         mPage = 1 - mPage;
-        return false;
+        break;
     case HIDE:
         gFocusMgr.setKeyboardFocus(nullptr);
-        return false;
+        break;
+    case GEAR:
+        return SETTINGS;
+    case GAP:
+        break;
     }
-    return false;
+    return TYPED;
 }
 
 void LLVRKeyboard::type(const LLWString& text)
@@ -509,7 +672,7 @@ void LLVRKeyboard::type(const LLWString& text)
 
 void LLVRKeyboard::learnText(const LLWString& text, U32 weight)
 {
-    countWords(text, mTypedWords, weight);
+    countText(text, mTyped, weight);
 }
 
 void LLVRKeyboard::reset()
@@ -520,62 +683,86 @@ void LLVRKeyboard::reset()
 
 void LLVRKeyboard::update()
 {
-    if (!mLoadStarted)
+    static LLCachedControl<bool> suggest(gSavedSettings, "SLVRWordSuggestions", true);
+    if (suggest && !mLoadStarted)
     {
         const std::string dir = gDirUtilp->getPerAccountChatLogsDir();
         if (!dir.empty()) // empty until logged in
         {
             mLoadStarted = true;
-            mLoading = std::async(std::launch::async, loadLogWords, dir);
+            mLoading = std::async(std::launch::async, loadLog, dir);
         }
     }
     if (mLoading.valid() && mLoading.wait_for(std::chrono::seconds(0)) == std::future_status::ready)
     {
-        mLogWords = mLoading.get();
-        mWordKey.clear(); // suggest again with the new words
+        mLog = mLoading.get();
+        mContext.clear(); // suggest again with what the logs said
     }
 
+    // The word before the text cursor, and the one before that in the same sentence.
     LLWString text;
     S32 cursor = 0;
     mWord.clear();
-    if (focusedText(text, cursor))
+    mPrevious.clear();
+    if (suggest && focusedText(text, cursor))
     {
-        S32 start = llclamp(cursor, 0, (S32)text.size());
+        const S32 end = llclamp(cursor, 0, (S32)text.size());
+        S32 start = end;
         while (start > 0 && isLetter(text[start - 1]))
         {
             --start;
         }
-        mWord = text.substr(start, cursor - start);
+        mWord = text.substr(start, end - start);
+        S32 before = start;
+        while (before > 0 && (text[before - 1] == ' ' || text[before - 1] == ','))
+        {
+            --before;
+        }
+        S32 first = before;
+        while (first > 0 && isLetter(text[first - 1]))
+        {
+            --first;
+        }
+        if (before < start && first < before && before - first <= 24)
+        {
+            mPrevious = wordKey(text.substr(first, before - first));
+        }
     }
-    const std::string key = wordKey(mWord);
-    if (key != mWordKey || mWord.empty())
+    const std::string context = mPrevious + '|' + wordKey(mWord) + (mShift || mCapsLock ? "^" : "") + sLayout;
+    if (context != mContext)
     {
-        mWordKey = key;
+        mContext = context;
         refreshSuggestions();
     }
 }
 
-// The three most frequent known words that the word being typed begins, in its case.
+// The three likeliest words: ones that the word being typed begins, raised when they were
+// seen after the previous word; with nothing typed yet, those seen after the previous word.
 void LLVRKeyboard::refreshSuggestions()
 {
     for (LLWString& suggestion : mSuggestions)
     {
         suggestion.clear();
     }
-    if (mWordKey.empty())
+    const std::string word = wordKey(mWord);
+    if (word.empty() && mPrevious.empty())
     {
         return;
     }
     std::map<std::string, U32> scores;
-    for (const word_map_t* words : { &mLogWords, &mTypedWords })
+    for (const Learned* learned : { &mLog, &mTyped })
     {
-        const U32 weight = words == &mTypedWords ? TYPED_WEIGHT : 1;
-        for (auto it = words->lower_bound(mWordKey); it != words->end() && it->first.compare(0, mWordKey.size(), mWordKey) == 0; ++it)
+        const U32 weight = learned == &mTyped ? TYPED_WEIGHT : 1;
+        if (!word.empty())
         {
-            if (it->first.size() > mWordKey.size())
-            {
-                scores[it->first] += it->second * weight;
-            }
+            withPrefix(learned->words, word, [&](const std::string& key, U32 count)
+                       { if (key.size() > word.size()) scores[key] += count * weight; });
+        }
+        if (!mPrevious.empty())
+        {
+            const std::string prefix = mPrevious + ' ';
+            withPrefix(learned->pairs, prefix + word, [&](const std::string& key, U32 count)
+                       { if (key.size() > prefix.size() + word.size()) scores[key.substr(prefix.size())] += count * weight * PAIR_WEIGHT; });
         }
     }
     std::vector<std::pair<U32, std::string>> ranked;
@@ -586,60 +773,91 @@ void LLVRKeyboard::refreshSuggestions()
     const size_t count = llmin(ranked.size(), (size_t)3);
     std::partial_sort(ranked.begin(), ranked.begin() + count, ranked.end(),
                       [](const auto& a, const auto& b) { return a.first > b.first || (a.first == b.first && a.second < b.second); });
-    const bool capital = upper(mWord[0]) == mWord[0] && lower(mWord[0]) != mWord[0];
-    const bool all_capitals = capital && mWord.size() > 1 && upper(mWord[1]) == mWord[1] && lower(mWord[1]) != mWord[1];
+    // In the case typed so far; a next word in the case shift asks for.
+    bool capital = mShift || mCapsLock, all_capitals = mCapsLock;
+    if (!mWord.empty())
+    {
+        capital = upper(mWord[0]) == mWord[0] && lower(mWord[0]) != mWord[0];
+        all_capitals = capital && mWord.size() > 1 && upper(mWord[1]) == mWord[1] && lower(mWord[1]) != mWord[1];
+    }
     for (size_t i = 0; i < count; ++i)
     {
-        LLWString word = utf8str_to_wstring(ranked[i].second);
-        for (size_t c = 0; c < word.size(); ++c)
+        LLWString suggestion = utf8str_to_wstring(ranked[i].second);
+        for (size_t c = 0; c < suggestion.size(); ++c)
         {
             if (all_capitals || (capital && c == 0))
             {
-                word[c] = upper(word[c]);
+                suggestion[c] = upper(suggestion[c]);
             }
         }
-        mSuggestions[i] = word;
+        mSuggestions[i] = suggestion;
     }
 }
 
 // Runs once when VR is switched on.
 void LLVRKeyboard::selfCheck()
 {
-    // Every page fills its 13 units a row, and the keys do not overlap the suggestion bar.
-    for (S32 page = 0; page < 2; ++page)
+    // Every layout fills its rows, with letters not too narrow to hit, and the keys stay
+    // clear of the suggestion bar.
+    for (const std::vector<KeyDef>& row : SYMBOL_ROWS)
     {
-        for (const RowDef& row : PAGES[page])
+        llassert_always(fabsf(rowWidth(row) - 13.f) < 0.01f);
+    }
+    for (const LLVRLanguage::Language& language : LLVRLanguage::all())
+    {
+        for (const std::vector<KeyDef>& row : letterRows(language.keyboard))
         {
-            F32 width = row.indent;
-            for (const KeyDef& key : row.keys)
+            llassert_always(fabsf(rowWidth(row) - 13.f) < 0.01f);
+            for (const KeyDef& key : row)
             {
-                width += key.width;
+                llassert_always(key.action != TEXT || key.width > 0.8f);
             }
-            llassert_always(fabsf(width - 13.f) < 0.01f);
         }
     }
     llassert_always(KEYS_TOP < SUGGEST_BOTTOM && KEYS_TOP - 4.f * UNIT > BODY_BOTTOM);
 
-    // Turkish case mapping both ways, and words split on anything but letters.
-    llassert_always(upper('i') == 0x130 && upper(0x131) == 'I' && lower(0x130) == 'i' && upper(0x15F) == 0x15E && lower(0xC7) == 0xE7);
-    std::map<std::string, U32> words;
-    countWords(utf8str_to_wstring("[12:00] Ali: Merhaba, merhaba d\xC3\xBCnya! a"), words, 1);
-    llassert_always(words.size() == 3 && words["merhaba"] == 2 && words["d\xC3\xBCnya"] == 1 && words["ali"] == 1);
+    // Case mapping both ways, Turkish i included, and words split on anything but letters.
+    const bool turkic = sTurkic;
+    sTurkic = true;
+    llassert_always(upper('i') == 0x130 && upper(0x131) == 'I' && lower(0x130) == 'i' && lower('I') == 0x131);
+    llassert_always(upper(0x15F) == 0x15E && lower(0xC7) == 0xE7);
+    sTurkic = false;
+    llassert_always(upper('i') == 'I' && lower('I') == 'i' && upper(0x439) == 0x419 && lower(0x141) == 0x142);
+    llassert_always(isLetter(0x259) && isLetter(0x44F) && !isLetter('3') && !isLetter(','));
+    sTurkic = turkic;
+    Learned learned;
+    countText(logMessage(utf8str_to_wstring("[2026/11/20 21:03]  Ali Resident: Merhaba, merhaba d\xC3\xBCnya! a")), learned, 1);
+    llassert_always(learned.words.size() == 2 && learned.words["merhaba"] == 2 && learned.words["d\xC3\xBCnya"] == 1);
+    llassert_always(learned.pairs.size() == 2 && learned.pairs["merhaba merhaba"] == 1 && learned.pairs["merhaba d\xC3\xBCnya"] == 1);
 
     // What lies where.
     LLVRKeyboard keyboard;
-    const LLRectf q = keyBoxes(0)[0].rect;
-    const Hit key = keyboard.hitAt((S32)q.getCenterX(), (S32)q.getCenterY());
+    const LLRectf first = keyBoxes(0)[0].rect;
+    const Hit key = keyboard.hitAt((S32)first.getCenterX(), (S32)first.getCenterY());
     llassert_always(key.part == KEY && key.index == 0 && keyBoxes(0)[0].def.action == TEXT);
     llassert_always(keyboard.hitAt(WIDTH / 2, 20).part == HANDLE);
     llassert_always(keyboard.hitAt((S32)MARGIN + 10, (S32)SUGGEST_BOTTOM + 10).part == SUGGESTION);
     llassert_always(keyboard.hitAt(WIDTH + 5, 20).part == NONE);
 
     // Completion: most frequent first, in the case typed.
-    keyboard.mTypedWords["merhaba"] = 1;
-    keyboard.mTypedWords["merhem"] = 2;
+    keyboard.mTyped.words["merhaba"] = 1;
+    keyboard.mTyped.words["merhem"] = 2;
     keyboard.mWord = utf8str_to_wstring("Mer");
-    keyboard.mWordKey = "mer";
     keyboard.refreshSuggestions();
     llassert_always(wstring_to_utf8str(keyboard.mSuggestions[0]) == "Merhem" && wstring_to_utf8str(keyboard.mSuggestions[1]) == "Merhaba");
+
+    // The next word: what followed the previous one, before what is merely frequent.
+    const std::string nasilsin = "nas\xC4\xB1ls\xC4\xB1n";
+    keyboard.mLog.words["nasa"] = 20;
+    keyboard.mTyped.pairs["merhaba " + nasilsin] = 3;
+    keyboard.mTyped.pairs["merhaba naber"] = 1;
+    keyboard.mPrevious = "merhaba";
+    keyboard.mWord.clear();
+    keyboard.refreshSuggestions();
+    llassert_always(wstring_to_utf8str(keyboard.mSuggestions[0]) == nasilsin && wstring_to_utf8str(keyboard.mSuggestions[1]) == "naber"
+                    && keyboard.mSuggestions[2].empty());
+    keyboard.mWord = utf8str_to_wstring("na");
+    keyboard.refreshSuggestions();
+    llassert_always(wstring_to_utf8str(keyboard.mSuggestions[0]) == nasilsin && wstring_to_utf8str(keyboard.mSuggestions[1]) == "naber"
+                    && wstring_to_utf8str(keyboard.mSuggestions[2]) == "nasa");
 }

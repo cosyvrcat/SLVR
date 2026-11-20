@@ -21,6 +21,7 @@
 #include "v3math.h"
 
 #include <boost/signals2/connection.hpp>
+#include <future>
 #include <vector>
 
 class LLChat;
@@ -58,6 +59,10 @@ public:
     // a message from someone else lights a dot in view (instant messages are seen directly).
     void noteChat(const LLChat& chat);
 
+    // Y button and the SLVR menu: saves what the right eye sees, the panel and keyboard
+    // included, as a PNG in Pictures\SLVR.
+    void requestScreenshot();
+
     void shutdown();
 
 private:
@@ -71,14 +76,25 @@ private:
                         const float pos[3], const float dir[3], S32& x, S32& y, F32& distance);
     bool pointAtKeyboard(S32 hand, const float pos[3], const float dir[3], F32& length);
     void updateKeyboard();
+    void startZoom();
     void pressKeyboard(S32 hand);
     void releaseKeyboard(S32 hand);
     void showChat();
     void noteMessage(const LLUUID& from);
     void drawLaser(const LLVector3& start, const LLVector3& dir, F32 length);
-    void drawPanel();
-    void eraseAllButChat(S32 width, S32 height);
-    void drawKeyboard();
+    // A screenshot's quad layers: their image and where they were.
+    struct ShotLayer
+    {
+        std::vector<unsigned char> rgba; // premultiplied, bottom row first
+        int width = 0, height = 0;
+        float centre[3] = {}, rot[4] = {};
+        F32 width_m = 0.f, height_m = 0.f;
+    };
+    void drawPanel(ShotLayer* shot);
+    void drawChatOnly();
+    void drawKeyboard(ShotLayer* shot);
+    void showSettings();
+    void saveScreenshot(ShotLayer eye_image, ShotLayer panel, ShotLayer keyboard);
     void drawMessageDot();
     void applyInput();
     static void onIdle(void* self);
@@ -116,6 +132,8 @@ private:
     bool mMenuDown = false, mTriggerDown = false, mGripDown = false, mZoomDown = false, mTurned = false;
     bool mTriggerOnPanel = false, mGripOnPanel = false, mGripOnKeyboard = false; // where the press went; its release follows
     bool mTriggerOnKeyboard = false, mZoomOnKeyboard = false;
+    bool mZoomStarted = false;  // the left trigger was held long enough to zoom
+    LLFrameTimer mZoomTimer;
     F32 mZoomYawOffset = 0.f; // tracking space heading relative to the zoomed camera's, see applyInput()
     LLFrameTimer mClickTimer;   // since the last trigger press on the panel, for double clicks
     S32 mClickX = 0, mClickY = 0;
@@ -147,6 +165,9 @@ private:
     LLVRKeyboard::Hit mRepeatHit;
     LLFrameTimer mRepeatTimer;
     F32 mRepeatNext = 0.f;
+
+    bool mShotPending = false, mShotDown = false;
+    std::future<std::pair<bool, std::string>> mShotSaving; // written on a worker thread: saved, and where
 
     bool mFirstPerson = false;            // this frame is seen from the avatar's eyes
     bool mAttachmentsFirstPerson = false; // what the attachments' visibility was last set for
