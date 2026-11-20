@@ -2,7 +2,7 @@
 
 **SLVR is a personal, experimental VR (OpenXR) build of a Second Life viewer. It is based on Firestorm Viewer and is not affiliated with the Firestorm Project.** Do not ask Firestorm support for help with SLVR. VR code is derived from the P373R VR Mod (https://github.com/humbletim/p373r-vrmod).
 
-Windows installers are built by the `SLVR Windows build` GitHub Actions workflow and published under Releases. The original Firestorm README follows.
+This repository holds the source code only; no builds are published here. The original Firestorm README follows.
 
 ---
 
