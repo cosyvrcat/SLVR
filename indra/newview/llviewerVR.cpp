@@ -180,7 +180,9 @@ void LLViewerVR::updateEnabled()
         // Instant messages; nearby chat comes through noteChat().
         mIMConnection = LLIMModel::instance().addNewMsgCallback([this](const LLSD& msg)
         {
-            if (!msg["is_region_msg"].asBoolean())
+            static LLCachedControl<bool> private_only(gSavedSettings, "SLVRMessageDotPrivateOnly", true);
+            const LLIMModel::LLIMSession* session = LLIMModel::instance().findIMSession(msg["session_id"].asUUID());
+            if (!msg["is_region_msg"].asBoolean() && (!private_only || (session && session->isP2PSessionType())))
             {
                 noteMessage(msg["from_id"].asUUID());
             }
@@ -382,7 +384,7 @@ bool LLViewerVR::endEye()
         shot_panel = std::make_unique<ShotLayer>();
         shot_keyboard = std::make_unique<ShotLayer>();
     }
-    if (mPanelVisible)
+    if (mPanelVisible || mMenuOnly)
     {
         drawPanel(shot_panel.get());
     }
@@ -552,7 +554,7 @@ bool LLViewerVR::pointAtKeyboard(S32 hand, const float pos[3], const float dir[3
 bool LLViewerVR::hitPanel(const float pos[3], const float dir[3], S32& x, S32& y, F32& distance) const
 {
     const LLRect window = gViewerWindow->getWindowRectRaw();
-    if (!mPanelVisible || window.getWidth() <= 0 || window.getHeight() <= 0)
+    if ((!mPanelVisible && !mMenuOnly) || window.getWidth() <= 0 || window.getHeight() <= 0)
     {
         return false;
     }
@@ -566,7 +568,7 @@ bool LLViewerVR::hitPanel(const float pos[3], const float dir[3], S32& x, S32& y
     // While a press on the panel lasts (dragging a window by its title), the whole panel
     // takes the laser: the window follows one frame behind and the laser would slip off it.
     const bool pressed = (mTriggerDown && mTriggerOnPanel) || (mGripDown && mGripOnPanel);
-    if (mChatOnly && !pressed
+    if ((mChatOnly || !mPanelVisible) && !pressed
         && std::none_of(mPanelKeep.begin(), mPanelKeep.end(), [&](const LLRect& r) { return r.pointInRect(px, py); }))
     {
         return false;
@@ -724,7 +726,7 @@ void LLViewerVR::drawPanel(ShotLayer* shot)
     GLint target = 0, after = 0;
     glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &target);
     gViewerWindow->setup3DRender();
-    if (!mChatOnly) // the chat alone means the chat alone
+    if (mPanelVisible && !mChatOnly) // the chat alone means the chat alone
     {
         render_hud_attachments();
     }
@@ -763,7 +765,7 @@ void LLViewerVR::drawPanel(ShotLayer* shot)
     // menus) nearly invisible; gGLCoverageAlpha accumulates it as coverage instead.
     gGLCoverageAlpha = true;
     gGL.blendFunc(LLRender::BF_SOURCE_ALPHA, LLRender::BF_ONE_MINUS_SOURCE_ALPHA);
-    if (mChatOnly)
+    if (mChatOnly || !mPanelVisible)
     {
         gUIProgram.bind();
         drawChatOnly();
@@ -806,11 +808,12 @@ void LLViewerVR::drawPanel(ShotLayer* shot)
 
 // With only the chat shown: instead of the whole UI, only the conversation windows and the
 // open menus are drawn (back to front, as the UI would), so nothing that overlaps them leaks
-// onto the panel. Their rectangles also bound where the lasers hit the panel.
+// onto the panel. Their rectangles also bound where the lasers hit the panel. With the
+// panel hidden, a context menu is drawn alone the same way.
 void LLViewerVR::drawChatOnly()
 {
     std::vector<LLView*> views;
-    for (auto it = gFloaterView->getChildList()->rbegin(); it != gFloaterView->getChildList()->rend(); ++it)
+    for (auto it = gFloaterView->getChildList()->rbegin(); mPanelVisible && it != gFloaterView->getChildList()->rend(); ++it)
     {
         LLFloater* floater = dynamic_cast<LLFloater*>(*it);
         if (floater && floater->isShown() && !floater->getHost()
@@ -944,7 +947,8 @@ void LLViewerVR::drawMessageDot()
 
 void LLViewerVR::noteChat(const LLChat& chat)
 {
-    if (chat.mSourceType == CHAT_SOURCE_AGENT)
+    static LLCachedControl<bool> private_only(gSavedSettings, "SLVRMessageDotPrivateOnly", true);
+    if (chat.mSourceType == CHAT_SOURCE_AGENT && !private_only)
     {
         noteMessage(chat.mFromID);
     }
@@ -1281,6 +1285,11 @@ void LLViewerVR::applyInput()
     {
         mUnread = false;
     }
+    // A context menu shown on the hidden panel goes with the panel once it closes.
+    if (mMenuOnly && (mPanelVisible || (!mGripDown && !gMenuHolder->hasVisibleMenu() && !gFocusMgr.getTopCtrl())))
+    {
+        mMenuOnly = false;
+    }
 
     // Left stick walks and strafes, like the arrow keys. Walking brings a zoomed camera
     // back to the avatar.
@@ -1473,7 +1482,7 @@ void LLViewerVR::applyInput()
         {
             mGripOnKeyboard = on_keyboard; // nothing to click there
             mGripOnPanel = on_panel;
-            mPanelVisible = true; // the context menu opens on the panel
+            mMenuOnly = !mPanelVisible; // the context menu opens on the panel, alone if it was hidden
         }
         if (mGripOnPanel)
         {

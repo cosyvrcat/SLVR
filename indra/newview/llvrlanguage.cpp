@@ -107,6 +107,7 @@ namespace
             getChild<LLTextBox>("language_label")->setText(LLVRLanguage::text("language_label"));
             getChild<LLTextBox>("keyboard_label")->setText(LLVRLanguage::text("keyboard_label"));
             getChild<LLCheckBoxCtrl>("word_suggestions")->setLabel(LLVRLanguage::text("word_suggestions"));
+            getChild<LLCheckBoxCtrl>("message_dot_private")->setLabel(LLVRLanguage::text("message_dot_private"));
 
             LLComboBox* language = getChild<LLComboBox>("language");
             LLComboBox* layout = getChild<LLComboBox>("keyboard_layout");

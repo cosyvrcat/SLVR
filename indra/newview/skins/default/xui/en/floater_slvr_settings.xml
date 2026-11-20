@@ -3,7 +3,7 @@
 <floater
  legacy_header_height="18"
  can_resize="false"
- height="128"
+ height="154"
  layout="topleft"
  name="slvr_settings"
  single_instance="true"
@@ -55,5 +55,15 @@
      left="12"
      name="word_suggestions"
      top="98"
+     width="395" />
+    <check_box
+     control_name="SLVRMessageDotPrivateOnly"
+     follows="left|top"
+     height="16"
+     label="Message dot only for private chats"
+     layout="topleft"
+     left="12"
+     name="message_dot_private"
+     top="124"
      width="395" />
 </floater>

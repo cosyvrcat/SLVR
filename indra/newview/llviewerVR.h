@@ -109,6 +109,7 @@ private:
     bool mInputFresh = false;   // mInput was read this frame and not yet acted on
     bool mPanelVisible = true;  // the menu button steps through all of it, chat only, and hidden
     bool mChatOnly = false;
+    bool mMenuOnly = false;     // panel hidden, but a context menu opened by the right grip is shown alone
     std::vector<LLRect> mPanelKeep; // with chat only: what is left of the panel, window pixels
     bool mUnread = false;       // a message came in while the panel was hidden
     boost::signals2::connection mIMConnection;
