@@ -27,18 +27,22 @@
 #include "llnotificationsutil.h"
 #include "llrender.h"
 #include "llrender2dutils.h"
+#include "llspatialpartition.h"
+#include "lltoast.h"
 #include "lltool.h"
 #include "lltoolmgr.h"
 #include "lluictrl.h"
 #include "llviewercamera.h"
 #include "llviewercontrol.h"
 #include "llviewermenu.h"
+#include "llviewerjointattachment.h"
 #include "llviewerobject.h"
 #include "llviewershadermgr.h"
 #include "llviewerwindow.h"
 #include "llvrlanguage.h"
 #include "llvoavatarself.h"
 #include "llwindow.h"
+#include "piemenu.h"
 #include "pipeline.h"
 
 #include "llfile.h"
@@ -105,6 +109,14 @@ namespace
 
     // What "chat only" keeps of the panel: Firestorm's conversation windows, docked or torn off.
     const char* const CHAT_FLOATERS[] = { "fs_im_container", "fs_nearby_chat", "fs_impanel" };
+    bool isChatFloater(LLFloater* floater)
+    {
+        return std::any_of(std::begin(CHAT_FLOATERS), std::end(CHAT_FLOATERS),
+                           [&](const char* name) { return floater->getInstanceName() == name; });
+    }
+    // Seconds after a press on the panel in which a window that opens counts as asked for
+    // there (a menu item, a link in the chat), see updatePopped().
+    const F32 POP_AFTER_CLICK = 3.f;
     const F32 MESSAGE_DOT_RADIUS = 0.012f; // metres, a metre ahead
 
     const F32 SNAP_TURN = 30.f * DEG_TO_RAD;
@@ -384,7 +396,7 @@ bool LLViewerVR::endEye()
         shot_panel = std::make_unique<ShotLayer>();
         shot_keyboard = std::make_unique<ShotLayer>();
     }
-    if (mPanelVisible || mMenuOnly)
+    if (panelShown())
     {
         drawPanel(shot_panel.get());
     }
@@ -554,7 +566,7 @@ bool LLViewerVR::pointAtKeyboard(S32 hand, const float pos[3], const float dir[3
 bool LLViewerVR::hitPanel(const float pos[3], const float dir[3], S32& x, S32& y, F32& distance) const
 {
     const LLRect window = gViewerWindow->getWindowRectRaw();
-    if ((!mPanelVisible && !mMenuOnly) || window.getWidth() <= 0 || window.getHeight() <= 0)
+    if (!panelShown() || window.getWidth() <= 0 || window.getHeight() <= 0)
     {
         return false;
     }
@@ -809,16 +821,15 @@ void LLViewerVR::drawPanel(ShotLayer* shot)
 // With only the chat shown: instead of the whole UI, only the conversation windows and the
 // open menus are drawn (back to front, as the UI would), so nothing that overlaps them leaks
 // onto the panel. Their rectangles also bound where the lasers hit the panel. With the
-// panel hidden, a context menu is drawn alone the same way.
+// panel hidden, a context menu is drawn alone the same way. In both, so are the windows
+// of updatePopped().
 void LLViewerVR::drawChatOnly()
 {
     std::vector<LLView*> views;
-    for (auto it = gFloaterView->getChildList()->rbegin(); mPanelVisible && it != gFloaterView->getChildList()->rend(); ++it)
+    for (auto it = gFloaterView->getChildList()->rbegin(); it != gFloaterView->getChildList()->rend(); ++it)
     {
         LLFloater* floater = dynamic_cast<LLFloater*>(*it);
-        if (floater && floater->isShown() && !floater->getHost()
-            && std::any_of(std::begin(CHAT_FLOATERS), std::end(CHAT_FLOATERS),
-                           [&](const char* name) { return floater->getInstanceName() == name; }))
+        if (floater && floater->isShown() && !floater->getHost() && ((mPanelVisible && isChatFloater(floater)) || isPopped(floater)))
         {
             views.push_back(floater);
         }
@@ -853,11 +864,94 @@ void LLViewerVR::drawChatOnly()
         LLUI::pushMatrix();
         LLUI::translate((F32)r.mLeft, (F32)r.mBottom);
         view->draw();
+        if (dynamic_cast<PieMenu*>(view))
+        {
+            // Alone on the panel a pie menu reads fainter than over the whole UI. Drawn over
+            // itself, its 80% background covers 96%.
+            view->draw();
+        }
         LLUI::popMatrix();
     }
     LLUI::popMatrix();
     gGL.popMatrix();
     LLView::sIsDrawing = false;
+}
+
+// With the panel hidden or showing only the chat, a window opened from there (an item of a
+// pie or context menu, a link in the chat) would open out of sight; script dialogs (a
+// chair's menu) come up without any click on the panel. Those are drawn as well, until
+// they close. Back on the whole panel the list starts over.
+void LLViewerVR::updatePopped()
+{
+    std::vector<LLFloater*> shown;
+    for (LLView* view : *gFloaterView->getChildList())
+    {
+        LLFloater* floater = dynamic_cast<LLFloater*>(view);
+        if (floater && floater->isShown() && !floater->getHost() && !dynamic_cast<LLNotificationsUI::LLToast*>(floater)) // not chat bubbles
+        {
+            shown.push_back(floater);
+        }
+    }
+    // A new conversation opens as a tab of a window that may be open already: the keyboard
+    // focus moving into a window counts as that window opening.
+    LLView* focus = dynamic_cast<LLView*>(gFocusMgr.getKeyboardFocus());
+    LLFloater* focus_floater = focus && focus != mFocusBefore ? gFloaterView->getParentFloater(focus) : nullptr;
+
+    if (mPanelVisible && !mChatOnly)
+    {
+        mPopped.clear();
+    }
+    else
+    {
+        mPopped.erase(std::remove_if(mPopped.begin(), mPopped.end(),
+                                     [](const LLHandle<LLFloater>& h) { return h.isDead() || !h.get()->isShown() || h.get()->getHost(); }),
+                      mPopped.end());
+        const bool asked = mPanelClickTimer.getStarted() && mPanelClickTimer.getElapsedTimeF32() < POP_AFTER_CLICK;
+        for (LLFloater* floater : shown)
+        {
+            const bool opened = floater == focus_floater || std::find(mShownBefore.begin(), mShownBefore.end(), floater) == mShownBefore.end();
+            if (!isPopped(floater) && !(mChatOnly && isChatFloater(floater))
+                && (floater->getInstanceName() == "script_floater" || (asked && opened)))
+            {
+                mPopped.push_back(floater->getHandle());
+            }
+        }
+    }
+    mShownBefore.assign(shown.begin(), shown.end());
+    mFocusBefore = focus;
+}
+
+bool LLViewerVR::isPopped(const LLFloater* floater) const
+{
+    return std::any_of(mPopped.begin(), mPopped.end(), [&](const LLHandle<LLFloater>& h) { return h.get() == floater; });
+}
+
+// The own avatar has been seen to vanish in the zoom now and then, leaving only its name
+// tag (v0.5.1). Until the cause is known, every zoom logs what decides whether it is drawn.
+void LLViewerVR::logZoom() const
+{
+    if (!isAgentAvatarValid())
+    {
+        return;
+    }
+    S32 attached = 0, hidden = 0;
+    for (const auto& point : gAgentAvatarp->mAttachmentPoints)
+    {
+        for (const auto& object : point.second ? point.second->mAttachedObjects : LLViewerJointAttachment::attachedobjs_vec_t())
+        {
+            LLSpatialBridge* bridge = object && object->mDrawable.notNull() ? object->mDrawable.get()->getSpatialBridge() : nullptr;
+            if (bridge)
+            {
+                ++attached;
+                hidden += bridge->mDrawableType == 0;
+            }
+        }
+    }
+    LL_INFOS("VR") << "Zoom: avatar drawn " << gAgent.needsRenderAvatar() << ", shown " << gAgent.getShowAvatar()
+                   << ", eyes view " << mFirstPerson << " (attachments set for " << mAttachmentsFirstPerson << ")"
+                   << ", camera mode " << gAgentCamera.getCameraMode() << ", focus on avatar " << gAgentCamera.getFocusOnAvatar()
+                   << ", attachments hidden " << hidden << " of " << attached << ", avatar visible " << gAgentAvatarp->isVisible()
+                   << LL_ENDL;
 }
 
 // Draws the on-screen keyboard into its own quad layer, in front of the panel.
@@ -1290,6 +1384,7 @@ void LLViewerVR::applyInput()
     {
         mMenuOnly = false;
     }
+    updatePopped();
 
     // Left stick walks and strafes, like the arrow keys. Walking brings a zoomed camera
     // back to the avatar.
@@ -1336,7 +1431,7 @@ void LLViewerVR::applyInput()
         if (input.zoom)
         {
             mZoomOnKeyboard = mKeyboardHit[1].part != LLVRKeyboard::NONE;
-            mZoomStarted = false;
+            mZoomStarted = mZoomLogged = false;
             mZoomTimer.reset();
         }
         if (mZoomOnKeyboard)
@@ -1356,6 +1451,11 @@ void LLViewerVR::applyInput()
     const F32 x = input.turn[0], y = input.turn[1];
     const bool zooming = input.zoom && !mZoomOnKeyboard && mZoomStarted && !gAgentCamera.getFocusOnAvatar();
     const bool stick_free = !mGrabbing && !zooming && mDragHand < 0;
+    if (zooming && !mZoomLogged && mZoomTimer.getElapsedTimeF32() > ZOOM_HOLD + 1.f)
+    {
+        mZoomLogged = true;
+        logZoom();
+    }
     if (zooming && !mGrabbing && fabsf(x) < STICK_OFF && mWorldHit)
     {
         // While held, the focus follows the laser: zoom in to the top of a tree after pressing
@@ -1444,6 +1544,10 @@ void LLViewerVR::applyInput()
             mTriggerOnKeyboard = on_keyboard;
             mTriggerOnPanel = on_panel;
         }
+        if (mTriggerOnPanel)
+        {
+            mPanelClickTimer.start(); // the release too: menu items act on it
+        }
         if (mTriggerOnKeyboard)
         {
             input.trigger ? pressKeyboard(0) : releaseKeyboard(0);
@@ -1483,6 +1587,10 @@ void LLViewerVR::applyInput()
             mGripOnKeyboard = on_keyboard; // nothing to click there
             mGripOnPanel = on_panel;
             mMenuOnly = !mPanelVisible; // the context menu opens on the panel, alone if it was hidden
+        }
+        if (mGripOnPanel)
+        {
+            mPanelClickTimer.start();
         }
         if (mGripOnPanel)
         {

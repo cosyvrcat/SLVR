@@ -1476,6 +1476,7 @@ void LLVOAvatarSelf::updateAttachmentVisibility(U32 camera_mode)
     {
         camera_mode = CAMERA_MODE_MOUSELOOK;
     }
+    gVR.attachmentsSet(gVR.firstPerson());
     for (attachment_map_t::iterator iter = mAttachmentPoints.begin();
          iter != mAttachmentPoints.end();
          ++iter)

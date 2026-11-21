@@ -15,6 +15,7 @@
 #define LL_LLVIEWERVR_H
 
 #include "llframetimer.h"
+#include "llhandle.h"
 #include "llrect.h"
 #include "llvrbackend.h"
 #include "llvrkeyboard.h"
@@ -25,6 +26,7 @@
 #include <vector>
 
 class LLChat;
+class LLFloater;
 
 class LLViewerVR
 {
@@ -54,6 +56,10 @@ public:
     // own eyes. The own avatar is then drawn as in mouselook (no head), without the viewer
     // being in mouselook, which would switch off the UI and the click tools.
     bool firstPerson() const { return mFirstPerson; }
+
+    // LLVOAvatarSelf::updateAttachmentVisibility() hook: whatever called it, the attachments
+    // are now set for this (firstPerson() at the time), so applyInput() knows when to set them again.
+    void attachmentsSet(bool first_person) { mAttachmentsFirstPerson = first_person; }
 
     // LLNotificationManager::onChat() hook: nearby chat came in. While the panel is hidden,
     // a message from someone else lights a dot in view (instant messages are seen directly).
@@ -92,6 +98,10 @@ private:
     };
     void drawPanel(ShotLayer* shot);
     void drawChatOnly();
+    void updatePopped();
+    bool isPopped(const LLFloater* floater) const;
+    bool panelShown() const { return mPanelVisible || mMenuOnly || !mPopped.empty(); }
+    void logZoom() const;
     void drawKeyboard(ShotLayer* shot);
     void showSettings();
     void saveScreenshot(ShotLayer eye_image, ShotLayer panel, ShotLayer keyboard);
@@ -111,6 +121,11 @@ private:
     bool mChatOnly = false;
     bool mMenuOnly = false;     // panel hidden, but a context menu opened by the right grip is shown alone
     std::vector<LLRect> mPanelKeep; // with chat only: what is left of the panel, window pixels
+    // Windows shown on top of what the panel mode shows (see updatePopped()), until they close.
+    std::vector<LLHandle<LLFloater>> mPopped;
+    std::vector<const LLFloater*> mShownBefore; // last frame's open windows, only compared
+    const void* mFocusBefore = nullptr;         // and the keyboard focus
+    LLFrameTimer mPanelClickTimer;              // since the last press on the panel
     bool mUnread = false;       // a message came in while the panel was hidden
     boost::signals2::connection mIMConnection;
     bool mLaserValid = false;   // right hand is tracked: the laser is drawn and steers world picks
@@ -134,6 +149,7 @@ private:
     bool mTriggerOnPanel = false, mGripOnPanel = false, mGripOnKeyboard = false; // where the press went; its release follows
     bool mTriggerOnKeyboard = false, mZoomOnKeyboard = false;
     bool mZoomStarted = false;  // the left trigger was held long enough to zoom
+    bool mZoomLogged = false;   // see logZoom()
     LLFrameTimer mZoomTimer;
     F32 mZoomYawOffset = 0.f; // tracking space heading relative to the zoomed camera's, see applyInput()
     LLFrameTimer mClickTimer;   // since the last trigger press on the panel, for double clicks
