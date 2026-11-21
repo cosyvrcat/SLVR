@@ -117,7 +117,7 @@ private:
     // Controllers: read while rendering, acted on from the next idle() like other input.
     LLVRInput mInput;
     bool mInputFresh = false;   // mInput was read this frame and not yet acted on
-    bool mPanelVisible = true;  // the menu button steps through all of it, chat only, and hidden
+    bool mPanelVisible = false; // the menu button steps through all of it, chat only, and hidden
     bool mChatOnly = false;
     bool mMenuOnly = false;     // panel hidden, but a context menu opened by the right grip is shown alone
     std::vector<LLRect> mPanelKeep; // with chat only: what is left of the panel, window pixels
@@ -125,7 +125,7 @@ private:
     std::vector<LLHandle<LLFloater>> mPopped;
     std::vector<const LLFloater*> mShownBefore; // last frame's open windows, only compared
     const void* mFocusBefore = nullptr;         // and the keyboard focus
-    LLFrameTimer mPanelClickTimer;              // since the last press on the panel
+    LLFrameTimer mPressTimer;                   // since the last press, but on the keyboard
     bool mUnread = false;       // a message came in while the panel was hidden
     boost::signals2::connection mIMConnection;
     bool mLaserValid = false;   // right hand is tracked: the laser is drawn and steers world picks
@@ -159,7 +159,7 @@ private:
 
     // The UI panel: a rectangle in tracking space, straight ahead of where the user sat when
     // VR started until it is moved (hold the left grip: it follows the laser).
-    float mPanelCentre[3] = { 0.f, -0.1f, -1.5f };
+    float mPanelCentre[3] = { 0.f, -0.1f, -1.2f };
     float mPanelRot[4] = { 0.f, 0.f, 0.f, 1.f }; // quaternion x, y, z, w; identity faces +Z
     F32 mPanelWidth = 1.8f;                      // metres; the height follows the window's aspect ratio
     bool mGrabbing = false;

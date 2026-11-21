@@ -114,9 +114,10 @@ namespace
         return std::any_of(std::begin(CHAT_FLOATERS), std::end(CHAT_FLOATERS),
                            [&](const char* name) { return floater->getInstanceName() == name; });
     }
-    // Seconds after a press on the panel in which a window that opens counts as asked for
-    // there (a menu item, a link in the chat), see updatePopped().
-    const F32 POP_AFTER_CLICK = 3.f;
+    // Seconds after a press (on the panel or on something in the world) in which a window
+    // that opens counts as asked for, see updatePopped(). A script dialog comes back from
+    // the region a moment after the touch.
+    const F32 POP_AFTER_PRESS = 5.f;
     const F32 MESSAGE_DOT_RADIUS = 0.012f; // metres, a metre ahead
 
     const F32 SNAP_TURN = 30.f * DEG_TO_RAD;
@@ -186,8 +187,7 @@ void LLViewerVR::updateEnabled()
             LLNotificationsUtil::add("GenericAlert", LLSD().with("MESSAGE", "VR could not be started: " + error));
             return;
         }
-        mPanelVisible = true;
-        mChatOnly = mUnread = false;
+        mPanelVisible = mChatOnly = mUnread = false; // VR starts with the panel hidden; the menu button shows it
         gIdleCallbacks.addFunction(onIdle, this);
         // Instant messages; nearby chat comes through noteChat().
         mIMConnection = LLIMModel::instance().addNewMsgCallback([this](const LLSD& msg)
@@ -863,12 +863,14 @@ void LLViewerVR::drawChatOnly()
                                 llceil(r.mRight * scale.mV[VX]), llfloor(r.mBottom * scale.mV[VY]));
         LLUI::pushMatrix();
         LLUI::translate((F32)r.mLeft, (F32)r.mBottom);
-        view->draw();
-        if (dynamic_cast<PieMenu*>(view))
+        // Alone on the panel a pie menu reads fainter than over the whole UI. Drawn over
+        // itself, its 80% background covers 96%. Each time from the same origin: its draw()
+        // moves the UI origin to its centre and leaves it there.
+        for (S32 times = dynamic_cast<PieMenu*>(view) ? 2 : 1; times > 0; --times)
         {
-            // Alone on the panel a pie menu reads fainter than over the whole UI. Drawn over
-            // itself, its 80% background covers 96%.
+            LLUI::pushMatrix();
             view->draw();
+            LLUI::popMatrix();
         }
         LLUI::popMatrix();
     }
@@ -877,10 +879,10 @@ void LLViewerVR::drawChatOnly()
     LLView::sIsDrawing = false;
 }
 
-// With the panel hidden or showing only the chat, a window opened from there (an item of a
-// pie or context menu, a link in the chat) would open out of sight; script dialogs (a
-// chair's menu) come up without any click on the panel. Those are drawn as well, until
-// they close. Back on the whole panel the list starts over.
+// With the panel hidden or showing only the chat, a window the user asked for (an item of a
+// pie or context menu, a link in the chat, the dialog of a chair just touched) would open
+// out of sight. Those are drawn as well, until they close; windows and dialogs nobody asked
+// for (a group's object calling) are not. Back on the whole panel the list starts over.
 void LLViewerVR::updatePopped()
 {
     std::vector<LLFloater*> shown;
@@ -906,12 +908,11 @@ void LLViewerVR::updatePopped()
         mPopped.erase(std::remove_if(mPopped.begin(), mPopped.end(),
                                      [](const LLHandle<LLFloater>& h) { return h.isDead() || !h.get()->isShown() || h.get()->getHost(); }),
                       mPopped.end());
-        const bool asked = mPanelClickTimer.getStarted() && mPanelClickTimer.getElapsedTimeF32() < POP_AFTER_CLICK;
+        const bool asked = mPressTimer.getStarted() && mPressTimer.getElapsedTimeF32() < POP_AFTER_PRESS;
         for (LLFloater* floater : shown)
         {
             const bool opened = floater == focus_floater || std::find(mShownBefore.begin(), mShownBefore.end(), floater) == mShownBefore.end();
-            if (!isPopped(floater) && !(mChatOnly && isChatFloater(floater))
-                && (floater->getInstanceName() == "script_floater" || (asked && opened)))
+            if (asked && opened && !isPopped(floater) && !(mChatOnly && isChatFloater(floater)))
             {
                 mPopped.push_back(floater->getHandle());
             }
@@ -1544,9 +1545,9 @@ void LLViewerVR::applyInput()
             mTriggerOnKeyboard = on_keyboard;
             mTriggerOnPanel = on_panel;
         }
-        if (mTriggerOnPanel)
+        if (!mTriggerOnKeyboard)
         {
-            mPanelClickTimer.start(); // the release too: menu items act on it
+            mPressTimer.start(); // the release too: menu items act on it
         }
         if (mTriggerOnKeyboard)
         {
@@ -1588,9 +1589,9 @@ void LLViewerVR::applyInput()
             mGripOnPanel = on_panel;
             mMenuOnly = !mPanelVisible; // the context menu opens on the panel, alone if it was hidden
         }
-        if (mGripOnPanel)
+        if (!mGripOnKeyboard)
         {
-            mPanelClickTimer.start();
+            mPressTimer.start();
         }
         if (mGripOnPanel)
         {
