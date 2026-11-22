@@ -680,6 +680,15 @@ void LLViewerCamera::getPixelVectors(const LLVector3 &pos_agent, LLVector3 &up, 
 
     F32 at_dist = to_vec * getAtAxis();
 
+    if (const F32* t = gVR.eyeTanFov()) // SLVR: the eye's own projection, and text scaled for the headset
+    {
+        const F32 scale = gVR.worldTextScale();
+        const F32 height_pixels = (F32)getViewHeightInPixels(), width_pixels = height_pixels * getAspect();
+        up = getUpAxis() * (at_dist * (t[2] - t[3]) / height_pixels * scale * gViewerWindow->getDisplayScale().mV[VY]);
+        right = -1.f * getLeftAxis() * (at_dist * (t[1] - t[0]) / width_pixels * scale * gViewerWindow->getDisplayScale().mV[VX]);
+        return;
+    }
+
     F32 height_meters = at_dist* (F32)tan(getView()/2.f);
     F32 height_pixels = getViewHeightInPixels()/2.f;
 

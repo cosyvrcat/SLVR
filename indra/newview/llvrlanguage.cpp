@@ -11,12 +11,14 @@
 
 #include "llvrlanguage.h"
 
+#include "llbutton.h"
 #include "llcheckboxctrl.h"
 #include "llcombobox.h"
 #include "lldir.h"
 #include "llfloater.h"
 #include "llfloaterreg.h"
 #include "llmenugl.h"
+#include "llnotificationsutil.h"
 #include "llsdserialize.h"
 #include "llsdutil.h"
 #include "llsliderctrl.h"
@@ -24,6 +26,7 @@
 #include "llui.h"
 #include "llviewercontrol.h"
 #include "llviewermenu.h"
+#include "llviewerVR.h"
 
 #include <fstream>
 
@@ -90,8 +93,11 @@ namespace
     // have the keys "laser_" + name.
     const char* const LASER_COLOURS[] = { "red", "orange", "yellow", "green", "blue", "purple", "white" };
 
-    // The SLVR settings: SLVR's language, the keyboard layout, word suggestions, turning, the
-    // comfort vignette and the lasers.
+    // The step turns the settings offer, in degrees.
+    const S32 SNAP_ANGLES[] = { 15, 30, 45, 90 };
+
+    // The SLVR settings: SLVR's language, the keyboard layout, word suggestions, the lasers and
+    // the panel on the left; turning, comfort, walking and height on the right.
     class LLFloaterSLVRSettings : public LLFloater
     {
     public:
@@ -107,6 +113,13 @@ namespace
                                                                 { gSavedSettings.setS32("SLVRVignette", ctrl->getValue().asInteger()); });
             getChild<LLComboBox>("laser_colour")->setCommitCallback([](LLUICtrl* ctrl, const LLSD&)
                                                                     { gSavedSettings.setString("SLVRLaserColor", ctrl->getValue().asString()); });
+            getChild<LLComboBox>("snap_angle")->setCommitCallback([](LLUICtrl* ctrl, const LLSD&)
+                                                                  { gSavedSettings.setS32("SLVRSnapAngle", ctrl->getValue().asInteger()); });
+            getChild<LLComboBox>("walk_direction")->setCommitCallback([](LLUICtrl* ctrl, const LLSD&)
+                                                                      { gSavedSettings.setS32("SLVRWalkDirection", ctrl->getValue().asInteger()); });
+            getChild<LLComboBox>("eye_height")->setCommitCallback([](LLUICtrl* ctrl, const LLSD&)
+                                                                  { gSavedSettings.setS32("SLVREyeHeightMode", ctrl->getValue().asInteger()); });
+            getChild<LLButton>("measure_height")->setCommitCallback([this](LLUICtrl*, const LLSD&) { measureHeight(); });
             translate();
             return true;
         }
@@ -122,6 +135,37 @@ namespace
             getChild<LLTextBox>("vignette_label")->setText(LLVRLanguage::text("vignette_label"));
             getChild<LLTextBox>("laser_colour_label")->setText(LLVRLanguage::text("laser_colour_label"));
             getChild<LLSliderCtrl>("laser_opacity")->setLabel(LLVRLanguage::text("laser_opacity"));
+            for (const char* name : { "blink", "left_handed", "ignore_script_camera", "haptics", "curved_panel", "panel_follow", "performance_preset" })
+            {
+                getChild<LLCheckBoxCtrl>(name)->setLabel(LLVRLanguage::text(name));
+            }
+            for (const char* name : { "snap_angle_label", "walk_direction_label", "eye_height_label" })
+            {
+                getChild<LLTextBox>(name)->setText(LLVRLanguage::text(name));
+            }
+            for (const char* name : { "turn_speed", "body_height", "text_scale" })
+            {
+                getChild<LLSliderCtrl>(name)->setLabel(LLVRLanguage::text(name));
+            }
+            getChild<LLButton>("measure_height")->setLabel(LLVRLanguage::text("measure_height"));
+
+            LLComboBox* snap = getChild<LLComboBox>("snap_angle");
+            snap->removeall();
+            for (S32 degrees : SNAP_ANGLES)
+            {
+                snap->add(llformat("%d\xC2\xB0", degrees), LLSD(degrees)); // UTF-8 degree sign
+            }
+            snap->setValue(gSavedSettings.getS32("SLVRSnapAngle"));
+            LLComboBox* walk = getChild<LLComboBox>("walk_direction");
+            walk->removeall();
+            walk->add(LLVRLanguage::text("walk_head"), LLSD(0));
+            walk->add(LLVRLanguage::text("walk_hand"), LLSD(1));
+            walk->setValue(gSavedSettings.getS32("SLVRWalkDirection"));
+            LLComboBox* eye_height = getChild<LLComboBox>("eye_height");
+            eye_height->removeall();
+            eye_height->add(LLVRLanguage::text("eye_height_avatar"), LLSD(0));
+            eye_height->add(LLVRLanguage::text("eye_height_mine"), LLSD(1));
+            eye_height->setValue(gSavedSettings.getS32("SLVREyeHeightMode"));
 
             LLComboBox* vignette = getChild<LLComboBox>("vignette");
             vignette->removeall();
@@ -155,6 +199,23 @@ namespace
             }
             language->setValue(gSavedSettings.getString("SLVRLanguage"));
             layout->setValue(gSavedSettings.getString("SLVRKeyboardLayout"));
+        }
+
+    private:
+        // Measured, the height is the user's own from now on.
+        void measureHeight()
+        {
+            F32 height = 0.f;
+            if (!gVR.measureHeight(height))
+            {
+                LLNotificationsUtil::add("SystemMessageTip", LLSD().with("MESSAGE", LLVRLanguage::text("height_not_measured")));
+                return;
+            }
+            gSavedSettings.setF32("SLVRBodyHeight", height);
+            gSavedSettings.setS32("SLVREyeHeightMode", 1);
+            getChild<LLComboBox>("eye_height")->setValue(1);
+            LLNotificationsUtil::add("SystemMessageTip",
+                                     LLSD().with("MESSAGE", LLVRLanguage::text("height_measured") + llformat(" %.2f m", height)));
         }
     };
 

@@ -3,20 +3,20 @@
 <floater
  legacy_header_height="18"
  can_resize="false"
- height="282"
+ height="368"
  layout="topleft"
  name="slvr_settings"
  single_instance="true"
  save_rect="true"
  title="SLVR Settings"
- width="420">
+ width="849">
     <text
      follows="left|top"
      height="16"
      layout="topleft"
      left="12"
      name="language_label"
-     top="32"
+     top="34"
      width="170">
         SLVR language:
     </text>
@@ -26,8 +26,8 @@
      layout="topleft"
      left="185"
      name="language"
-     top="28"
-     width="220" />
+     top="30"
+     width="230" />
     <text
      follows="left|top"
      height="16"
@@ -45,7 +45,7 @@
      left="185"
      name="keyboard_layout"
      top="60"
-     width="220" />
+     width="230" />
     <check_box
      control_name="SLVRWordSuggestions"
      follows="left|top"
@@ -54,8 +54,8 @@
      layout="topleft"
      left="12"
      name="word_suggestions"
-     top="98"
-     width="395" />
+     top="94"
+     width="403" />
     <check_box
      control_name="SLVRMessageDotPrivateOnly"
      follows="left|top"
@@ -65,42 +65,14 @@
      left="12"
      name="message_dot_private"
      top="124"
-     width="395" />
-    <check_box
-     control_name="SLVRSmoothTurn"
-     follows="left|top"
-     height="16"
-     label="Smooth turning (off: 30 degree steps)"
-     layout="topleft"
-     left="12"
-     name="smooth_turn"
-     top="150"
-     width="395" />
-    <text
-     follows="left|top"
-     height="16"
-     layout="topleft"
-     left="12"
-     name="vignette_label"
-     top="182"
-     width="170">
-        Comfort vignette:
-    </text>
-    <combo_box
-     follows="left|top"
-     height="23"
-     layout="topleft"
-     left="185"
-     name="vignette"
-     top="178"
-     width="220" />
+     width="403" />
     <text
      follows="left|top"
      height="16"
      layout="topleft"
      left="12"
      name="laser_colour_label"
-     top="214"
+     top="154"
      width="170">
         Laser colour:
     </text>
@@ -110,8 +82,8 @@
      layout="topleft"
      left="185"
      name="laser_colour"
-     top="210"
-     width="220" />
+     top="150"
+     width="230" />
     <slider
      control_name="SLVRLaserOpacity"
      decimal_digits="2"
@@ -125,6 +97,212 @@
      max_val="1"
      min_val="0.1"
      name="laser_opacity"
-     top="246"
-     width="393" />
+     top="184"
+     width="401" />
+    <check_box
+     control_name="SLVRHaptics"
+     follows="left|top"
+     height="16"
+     label="Controller vibration"
+     layout="topleft"
+     left="12"
+     name="haptics"
+     top="214"
+     width="403" />
+    <check_box
+     control_name="SLVRCurvedPanel"
+     follows="left|top"
+     height="16"
+     label="Curved panel"
+     layout="topleft"
+     left="12"
+     name="curved_panel"
+     top="244"
+     width="403" />
+    <check_box
+     control_name="SLVRPanelFollow"
+     follows="left|top"
+     height="16"
+     label="Panel follows my view"
+     layout="topleft"
+     left="12"
+     name="panel_follow"
+     top="274"
+     width="403" />
+    <slider
+     control_name="SLVRWorldTextScale"
+     decimal_digits="1"
+     follows="left|top"
+     height="16"
+     increment="0.1"
+     label="Name tag size:"
+     label_width="170"
+     layout="topleft"
+     left="12"
+     max_val="3"
+     min_val="0.5"
+     name="text_scale"
+     top="304"
+     width="401" />
+    <check_box
+     control_name="SLVRVRGraphics"
+     follows="left|top"
+     height="16"
+     label="Lighter graphics in VR (smoother)"
+     layout="topleft"
+     left="12"
+     name="performance_preset"
+     top="334"
+     width="403" />
+    <check_box
+     control_name="SLVRSmoothTurn"
+     follows="left|top"
+     height="16"
+     label="Smooth turning (off: in steps)"
+     layout="topleft"
+     left="434"
+     name="smooth_turn"
+     top="34"
+     width="403" />
+    <text
+     follows="left|top"
+     height="16"
+     layout="topleft"
+     left="434"
+     name="snap_angle_label"
+     top="64"
+     width="170">
+        Turn step:
+    </text>
+    <combo_box
+     follows="left|top"
+     height="23"
+     layout="topleft"
+     left="607"
+     name="snap_angle"
+     top="60"
+     width="230" />
+    <slider
+     control_name="SLVRSmoothTurnSpeed"
+     decimal_digits="0"
+     follows="left|top"
+     height="16"
+     increment="10"
+     label="Smooth turn speed:"
+     label_width="170"
+     layout="topleft"
+     left="434"
+     max_val="240"
+     min_val="10"
+     name="turn_speed"
+     top="94"
+     width="401" />
+    <text
+     follows="left|top"
+     height="16"
+     layout="topleft"
+     left="434"
+     name="vignette_label"
+     top="124"
+     width="170">
+        Comfort vignette:
+    </text>
+    <combo_box
+     follows="left|top"
+     height="23"
+     layout="topleft"
+     left="607"
+     name="vignette"
+     top="120"
+     width="230" />
+    <check_box
+     control_name="SLVRBlink"
+     follows="left|top"
+     height="16"
+     label="Blink over snap turns and teleports"
+     layout="topleft"
+     left="434"
+     name="blink"
+     top="154"
+     width="403" />
+    <text
+     follows="left|top"
+     height="16"
+     layout="topleft"
+     left="434"
+     name="walk_direction_label"
+     top="184"
+     width="170">
+        Walk towards:
+    </text>
+    <combo_box
+     follows="left|top"
+     height="23"
+     layout="topleft"
+     left="607"
+     name="walk_direction"
+     top="180"
+     width="230" />
+    <check_box
+     control_name="SLVRLeftHanded"
+     follows="left|top"
+     height="16"
+     label="Left-handed (swap the controllers)"
+     layout="topleft"
+     left="434"
+     name="left_handed"
+     top="214"
+     width="403" />
+    <check_box
+     control_name="SLVRIgnoreScriptCamera"
+     follows="left|top"
+     height="16"
+     label="Keep my eyes&apos; view when scripts move the camera"
+     layout="topleft"
+     left="434"
+     name="ignore_script_camera"
+     top="244"
+     width="403" />
+    <text
+     follows="left|top"
+     height="16"
+     layout="topleft"
+     left="434"
+     name="eye_height_label"
+     top="274"
+     width="170">
+        Eye height:
+    </text>
+    <combo_box
+     follows="left|top"
+     height="23"
+     layout="topleft"
+     left="607"
+     name="eye_height"
+     top="270"
+     width="230" />
+    <slider
+     control_name="SLVRBodyHeight"
+     decimal_digits="2"
+     follows="left|top"
+     height="16"
+     increment="0.01"
+     label="My height (m):"
+     label_width="170"
+     layout="topleft"
+     left="434"
+     max_val="2.3"
+     min_val="1"
+     name="body_height"
+     top="304"
+     width="401" />
+    <button
+     follows="left|top"
+     height="23"
+     label="Measure my height (stand up straight)"
+     layout="topleft"
+     left="434"
+     name="measure_height"
+     top="330"
+     width="403" />
 </floater>

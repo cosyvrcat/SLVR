@@ -42,7 +42,12 @@ namespace
     XrInstance sInstance = XR_NULL_HANDLE;
     XrSystemId sSystemId = XR_NULL_SYSTEM_ID;
     XrSession sSession = XR_NULL_HANDLE;
-    XrSpace sSpace = XR_NULL_HANDLE;
+    XrSpace sSpace = XR_NULL_HANDLE;      // the tracking space: sLocalSpace, or that recentred (recenter())
+    XrSpace sLocalSpace = XR_NULL_HANDLE; // the runtime's LOCAL space
+    XrSpace sViewSpace = XR_NULL_HANDLE;  // the head
+    XrSpace sStageSpace = XR_NULL_HANDLE; // floor level, when the runtime has one: for eyeHeight()
+    bool sRecentered = false;             // for takeRecentered()
+    bool sCanCurve = false;               // XR_KHR_composition_layer_cylinder is enabled
     XrEnvironmentBlendMode sBlendMode = XR_ENVIRONMENT_BLEND_MODE_OPAQUE;
     EyeTarget sTargets[2];
     EyeTarget sUITargets[LLVRBackend::UI_LAYERS]; // quad layers (flat UI, keyboard); created on first use
@@ -59,6 +64,10 @@ namespace
     XrAction sZoomAction = XR_NULL_HANDLE;
     XrAction sGrabAction = XR_NULL_HANDLE;
     XrAction sShotAction = XR_NULL_HANDLE;
+    XrAction sTeleportAction = XR_NULL_HANDLE;
+    XrAction sTalkAction = XR_NULL_HANDLE;
+    XrAction sRecenterAction = XR_NULL_HANDLE;
+    XrAction sHapticActions[2] = { XR_NULL_HANDLE, XR_NULL_HANDLE }; // right, left
     GLuint sUIDepth[LLVRBackend::UI_LAYERS] = {}; // depth buffers for the quad images (HUD attachments need one)
     XrAction sAimAction = XR_NULL_HANDLE;
     XrSpace sAimSpace = XR_NULL_HANDLE;
@@ -72,6 +81,8 @@ namespace
     int sUIBegun = -1;        // layer whose image beginUI() left acquired and bound, or -1
     bool sUIDone[LLVRBackend::UI_LAYERS] = {}; // sUILayers[i] is filled in for this frame
     XrCompositionLayerQuad sUILayers[LLVRBackend::UI_LAYERS];
+    XrCompositionLayerCylinderKHR sUICylinders[LLVRBackend::UI_LAYERS];
+    bool sUICurved[LLVRBackend::UI_LAYERS] = {}; // this frame the layer goes out as sUICylinders[i]
     XrViewStateFlags sViewStateFlags = 0;
     LLVRInput sLastInput;     // for the periodic log line
     XrTime sDisplayTime = 0;
@@ -176,6 +187,20 @@ namespace
                 logInteractionProfile("/user/hand/left");
                 logInteractionProfile("/user/hand/right");
                 break;
+            case XR_TYPE_EVENT_DATA_REFERENCE_SPACE_CHANGE_PENDING:
+                // The runtime recentred its LOCAL space; an own recentring on top of it would
+                // now be off by the old head pose.
+                if (reinterpret_cast<XrEventDataReferenceSpaceChangePending*>(&event)->referenceSpaceType == XR_REFERENCE_SPACE_TYPE_LOCAL)
+                {
+                    if (sSpace != sLocalSpace)
+                    {
+                        xrOk(xrDestroySpace(sSpace), "xrDestroySpace(recentred)");
+                        sSpace = sLocalSpace;
+                    }
+                    sRecentered = true;
+                    LL_INFOS("VR") << "Runtime recentred the tracking space" << LL_ENDL;
+                }
+                break;
             case XR_TYPE_EVENT_DATA_INSTANCE_LOSS_PENDING:
                 LL_WARNS("VR") << "Runtime announced instance loss" << LL_ENDL;
                 sAlive = false;
@@ -279,6 +304,11 @@ namespace
             { &sZoomAction, XR_ACTION_TYPE_BOOLEAN_INPUT, "zoom", "Zoom the camera to a point", "/user/hand/left/input/trigger/value" },
             { &sGrabAction, XR_ACTION_TYPE_BOOLEAN_INPUT, "grab", "Move the UI panel", "/user/hand/left/input/squeeze/value" },
             { &sShotAction, XR_ACTION_TYPE_BOOLEAN_INPUT, "screenshot", "Take a screenshot", "/user/hand/left/input/y/click" },
+            { &sTeleportAction, XR_ACTION_TYPE_BOOLEAN_INPUT, "teleport", "Teleport (hold, aim, let go)", "/user/hand/right/input/a/click" },
+            { &sTalkAction, XR_ACTION_TYPE_BOOLEAN_INPUT, "talk", "Push to talk", "/user/hand/right/input/b/click" },
+            { &sRecenterAction, XR_ACTION_TYPE_BOOLEAN_INPUT, "recenter", "Recentre (hold)", "/user/hand/left/input/x/click" },
+            { &sHapticActions[0], XR_ACTION_TYPE_VIBRATION_OUTPUT, "haptic_right", "Right vibration", "/user/hand/right/output/haptic" },
+            { &sHapticActions[1], XR_ACTION_TYPE_VIBRATION_OUTPUT, "haptic_left", "Left vibration", "/user/hand/left/output/haptic" },
             { &sAimAction, XR_ACTION_TYPE_POSE_INPUT, "aim", "Pointer", "/user/hand/right/input/aim/pose" },
             { &sLeftAimAction, XR_ACTION_TYPE_POSE_INPUT, "aim_left", "Left pointer (on-screen keyboard)", "/user/hand/left/input/aim/pose" },
         };
@@ -422,11 +452,13 @@ bool LLVRBackend::init(std::string& error)
         return fail("Could not list the OpenXR runtime's extensions.");
     }
     bool has_opengl = false;
+    sCanCurve = false;
     std::string ext_list;
     for (const XrExtensionProperties& ext : extensions)
     {
         ext_list += std::string(" ") + ext.extensionName;
         has_opengl = has_opengl || strcmp(ext.extensionName, XR_KHR_OPENGL_ENABLE_EXTENSION_NAME) == 0;
+        sCanCurve = sCanCurve || strcmp(ext.extensionName, XR_KHR_COMPOSITION_LAYER_CYLINDER_EXTENSION_NAME) == 0;
     }
     LL_INFOS("VR") << "Runtime extensions:" << ext_list << LL_ENDL;
     if (!has_opengl)
@@ -434,12 +466,12 @@ bool LLVRBackend::init(std::string& error)
         return fail("The active OpenXR runtime does not support OpenGL applications (XR_KHR_opengl_enable).");
     }
 
-    const char* const enabled_extensions[] = { XR_KHR_OPENGL_ENABLE_EXTENSION_NAME };
+    const char* const enabled_extensions[] = { XR_KHR_OPENGL_ENABLE_EXTENSION_NAME, XR_KHR_COMPOSITION_LAYER_CYLINDER_EXTENSION_NAME };
     XrInstanceCreateInfo instance_info{ XR_TYPE_INSTANCE_CREATE_INFO };
     snprintf(instance_info.applicationInfo.applicationName, XR_MAX_APPLICATION_NAME_SIZE, "SLVR");
     instance_info.applicationInfo.applicationVersion = 1;
     instance_info.applicationInfo.apiVersion = XR_MAKE_VERSION(1, 0, 0);
-    instance_info.enabledExtensionCount = 1;
+    instance_info.enabledExtensionCount = sCanCurve ? 2 : 1;
     instance_info.enabledExtensionNames = enabled_extensions;
     if (!xrOk(xrCreateInstance(&instance_info, &sInstance), "xrCreateInstance"))
     {
@@ -519,14 +551,29 @@ bool LLVRBackend::init(std::string& error)
     }
     sAlive = true;
 
-    // shortcut: seated/LOCAL space only; add STAGE (room scale, floor level) with a setting when needed.
+    // Seated (LOCAL) tracking: the eyes start at the avatar's, wherever the user sits or
+    // stands. STAGE only tells the eyes' height above the floor, see eyeHeight().
     XrReferenceSpaceCreateInfo space_info{ XR_TYPE_REFERENCE_SPACE_CREATE_INFO };
     space_info.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_LOCAL;
     space_info.poseInReferenceSpace.orientation.w = 1.f;
-    if (!xrOk(xrCreateReferenceSpace(sSession, &space_info, &sSpace), "xrCreateReferenceSpace(LOCAL)"))
+    if (!xrOk(xrCreateReferenceSpace(sSession, &space_info, &sLocalSpace), "xrCreateReferenceSpace(LOCAL)"))
     {
         return fail("Could not create the tracking space.");
     }
+    sSpace = sLocalSpace;
+    sRecentered = false;
+    space_info.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_VIEW;
+    xrOk(xrCreateReferenceSpace(sSession, &space_info, &sViewSpace), "xrCreateReferenceSpace(VIEW)");
+    uint32_t space_count = 0;
+    XrReferenceSpaceType space_types[8];
+    if (xrOk(xrEnumerateReferenceSpaces(sSession, LL_ARRAY_SIZE(space_types), &space_count, space_types), "xrEnumerateReferenceSpaces")
+        && std::find(space_types, space_types + space_count, XR_REFERENCE_SPACE_TYPE_STAGE) != space_types + space_count)
+    {
+        space_info.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_STAGE;
+        xrOk(xrCreateReferenceSpace(sSession, &space_info, &sStageSpace), "xrCreateReferenceSpace(STAGE)");
+    }
+    LL_INFOS("VR") << "Floor level (STAGE) " << (sStageSpace != XR_NULL_HANDLE ? "available" : "not available")
+                   << ", curved layers " << (sCanCurve ? "available" : "not available") << LL_ENDL;
 
     uint32_t blend_count = 0;
     XrEnvironmentBlendMode blend_modes[8];
@@ -654,10 +701,18 @@ void LLVRBackend::shutdown()
         glDeleteFramebuffers(1, &sFBO);
         sFBO = 0;
     }
-    if (sSpace != XR_NULL_HANDLE)
+    if (sSpace != XR_NULL_HANDLE && sSpace != sLocalSpace)
     {
-        xrOk(xrDestroySpace(sSpace), "xrDestroySpace");
-        sSpace = XR_NULL_HANDLE;
+        xrOk(xrDestroySpace(sSpace), "xrDestroySpace(recentred)");
+    }
+    sSpace = XR_NULL_HANDLE;
+    for (XrSpace* space : { &sLocalSpace, &sViewSpace, &sStageSpace })
+    {
+        if (*space != XR_NULL_HANDLE)
+        {
+            xrOk(xrDestroySpace(*space), "xrDestroySpace");
+            *space = XR_NULL_HANDLE;
+        }
     }
     if (sSession != XR_NULL_HANDLE)
     {
@@ -765,11 +820,87 @@ bool LLVRBackend::getInput(LLVRInput& input)
     input.zoom = readBoolean(sZoomAction, "xrGetActionStateBoolean(zoom)");
     input.grab = readBoolean(sGrabAction, "xrGetActionStateBoolean(grab)");
     input.shot = readBoolean(sShotAction, "xrGetActionStateBoolean(screenshot)");
+    input.teleport = readBoolean(sTeleportAction, "xrGetActionStateBoolean(teleport)");
+    input.talk = readBoolean(sTalkAction, "xrGetActionStateBoolean(talk)");
+    input.recenter = readBoolean(sRecenterAction, "xrGetActionStateBoolean(recenter)");
 
     input.aim_valid = locateAim(sAimSpace, "xrLocateSpace(aim)", input.aim_pos, input.aim_rot);
     input.left_aim_valid = locateAim(sLeftAimSpace, "xrLocateSpace(aim_left)", input.left_aim_pos, input.left_aim_rot);
     sLastInput = input;
     return true;
+}
+
+void LLVRBackend::vibrate(int hand, float amplitude, float seconds)
+{
+    if (sActionSet == XR_NULL_HANDLE || !sRunning || hand < 0 || hand > 1)
+    {
+        return;
+    }
+    XrHapticActionInfo info{ XR_TYPE_HAPTIC_ACTION_INFO };
+    info.action = sHapticActions[hand];
+    XrHapticVibration vibration{ XR_TYPE_HAPTIC_VIBRATION };
+    vibration.amplitude = std::clamp(amplitude, 0.f, 1.f);
+    vibration.duration = (XrDuration)(seconds * 1e9f);
+    vibration.frequency = XR_FREQUENCY_UNSPECIFIED;
+    xrOk(xrApplyHapticFeedback(sSession, &info, reinterpret_cast<const XrHapticBaseHeader*>(&vibration)), "xrApplyHapticFeedback");
+}
+
+void LLVRBackend::recenter()
+{
+    XrSpaceLocation location{ XR_TYPE_SPACE_LOCATION };
+    const XrSpaceLocationFlags needed = XR_SPACE_LOCATION_POSITION_VALID_BIT | XR_SPACE_LOCATION_ORIENTATION_VALID_BIT;
+    if (sViewSpace == XR_NULL_HANDLE || sDisplayTime == 0
+        || !xrOk(xrLocateSpace(sViewSpace, sLocalSpace, sDisplayTime, &location), "xrLocateSpace(view, local)")
+        || (location.locationFlags & needed) != needed)
+    {
+        return;
+    }
+    // Only the heading of the line of sight (-Z turned by the head) is kept: the horizon stays level.
+    const XrQuaternionf& q = location.pose.orientation;
+    const float forward_x = -2.f * (q.x * q.z + q.w * q.y), forward_z = -(1.f - 2.f * (q.x * q.x + q.y * q.y));
+    const float yaw = atan2f(-forward_x, -forward_z); // about +Y, which turns -Z to (-sin, 0, -cos)
+    XrReferenceSpaceCreateInfo info{ XR_TYPE_REFERENCE_SPACE_CREATE_INFO };
+    info.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_LOCAL;
+    info.poseInReferenceSpace.orientation = { 0.f, sinf(yaw / 2.f), 0.f, cosf(yaw / 2.f) };
+    info.poseInReferenceSpace.position = location.pose.position;
+    XrSpace space = XR_NULL_HANDLE;
+    if (!xrOk(xrCreateReferenceSpace(sSession, &info, &space), "xrCreateReferenceSpace(recentred)"))
+    {
+        return;
+    }
+    if (sSpace != sLocalSpace)
+    {
+        xrOk(xrDestroySpace(sSpace), "xrDestroySpace(recentred)");
+    }
+    sSpace = space;
+    sRecentered = true;
+    LL_INFOS("VR") << llformat("Recentred: heading %.0f deg, head at (%.2f %.2f %.2f)", yaw * RAD_TO_DEG,
+                               location.pose.position.x, location.pose.position.y, location.pose.position.z) << LL_ENDL;
+}
+
+bool LLVRBackend::takeRecentered()
+{
+    const bool moved = sRecentered;
+    sRecentered = false;
+    return moved;
+}
+
+bool LLVRBackend::eyeHeight(float& metres)
+{
+    XrSpaceLocation location{ XR_TYPE_SPACE_LOCATION };
+    if (sStageSpace == XR_NULL_HANDLE || sViewSpace == XR_NULL_HANDLE || sDisplayTime == 0
+        || !xrOk(xrLocateSpace(sViewSpace, sStageSpace, sDisplayTime, &location), "xrLocateSpace(view, stage)")
+        || !(location.locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT))
+    {
+        return false;
+    }
+    metres = location.pose.position.y;
+    return true;
+}
+
+bool LLVRBackend::canCurve() const
+{
+    return sCanCurve;
 }
 
 bool LLVRBackend::beginUI(int layer, int width, int height)
@@ -833,7 +964,7 @@ bool LLVRBackend::beginUI(int layer, int width, int height)
     return true;
 }
 
-void LLVRBackend::endUI(const float centre[3], const float rot[4], float width_m, float height_m)
+void LLVRBackend::endUI(const float centre[3], const float rot[4], float width_m, float height_m, float radius)
 {
     if (sUIBegun < 0)
     {
@@ -860,6 +991,26 @@ void LLVRBackend::endUI(const float centre[3], const float rot[4], float width_m
     quad.pose.orientation = { rot[0], rot[1], rot[2], rot[3] };
     quad.pose.position = { centre[0], centre[1], centre[2] };
     quad.size = { width_m, height_m };
+    sUICurved[layer] = sCanCurve && radius > 0.f;
+    if (sUICurved[layer])
+    {
+        // The cylinder's pose is on its axis, the arc's middle straight down its -Z: the axis
+        // lies `radius` out of the face (+Z turned by rot) from the centre.
+        XrCompositionLayerCylinderKHR& cylinder = sUICylinders[layer];
+        cylinder = { XR_TYPE_COMPOSITION_LAYER_CYLINDER_KHR };
+        cylinder.layerFlags = quad.layerFlags;
+        cylinder.space = quad.space;
+        cylinder.eyeVisibility = quad.eyeVisibility;
+        cylinder.subImage = quad.subImage;
+        const float x = rot[0], y = rot[1], z = rot[2], w = rot[3];
+        cylinder.pose.orientation = quad.pose.orientation;
+        cylinder.pose.position = { centre[0] + radius * 2.f * (x * z + w * y),
+                                   centre[1] + radius * 2.f * (y * z - w * x),
+                                   centre[2] + radius * (1.f - 2.f * (x * x + y * y)) };
+        cylinder.radius = radius;
+        cylinder.centralAngle = std::min(width_m / radius, 6.f);
+        cylinder.aspectRatio = width_m / height_m;
+    }
     sUIDone[layer] = true;
 }
 
@@ -1007,7 +1158,8 @@ void LLVRBackend::endFrame()
         {
             if (sUIDone[i])
             {
-                layers[layer_count++] = reinterpret_cast<XrCompositionLayerBaseHeader*>(&sUILayers[i]);
+                layers[layer_count++] = sUICurved[i] ? reinterpret_cast<XrCompositionLayerBaseHeader*>(&sUICylinders[i])
+                                                     : reinterpret_cast<XrCompositionLayerBaseHeader*>(&sUILayers[i]);
             }
         }
     }

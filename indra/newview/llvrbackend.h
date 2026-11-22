@@ -34,6 +34,9 @@ struct LLVRInput
     bool zoom = false;            // left index trigger
     bool grab = false;            // left grip
     bool shot = false;            // Y button: screenshot
+    bool teleport = false;        // A button, held: aims the teleport arc
+    bool talk = false;            // B button, held: push to talk
+    bool recenter = false;        // X button, held long: recentre
     bool aim_valid = false;       // right hand is tracked; aim_pos/aim_rot are usable
     float aim_pos[3] = { 0.f, 0.f, 0.f };     // right-hand pointing pose in tracking space,
     float aim_rot[4] = { 0.f, 0.f, 0.f, 1.f }; // pointing along its -Z
@@ -64,6 +67,21 @@ public:
     // false (input left untouched) when the controllers could not be set up or read.
     bool getInput(LLVRInput& input);
 
+    // Vibrates a controller (0 right, 1 left) at amplitude 0 to 1 for that many seconds.
+    void vibrate(int hand, float amplitude, float seconds);
+
+    // Makes where the head is now, facing where it faces (kept level), the origin of the
+    // tracking space. The runtime's own recentring (holding the Meta button) undoes it.
+    void recenter();
+    // True once after the tracking space moved (recenter() or the runtime's own): poses jump.
+    bool takeRecentered();
+
+    // Height of the eyes above the floor (the runtime's STAGE space), for calibrating.
+    bool eyeHeight(float& metres);
+
+    // Whether endUI() can bend a layer round the eyes (XR_KHR_composition_layer_cylinder).
+    bool canCurve() const;
+
     // Copies a rectangle of the window's back buffer into the image for one eye.
     bool submitEye(int eye, int x, int y, int width, int height);
 
@@ -71,11 +89,14 @@ public:
     // panel and the on-screen keyboard. beginUI() binds a width x height RGBA image of that
     // layer as the GL framebuffer; draw into it (alpha = coverage, premultiplied), then call
     // endUI() with the quad's centre and orientation (quaternion x, y, z, w; identity faces +Z)
-    // in tracking space and its size in metres. The image has a depth buffer. endUI()
-    // rebinds the window's framebuffer. One layer at a time, between beginFrame() and endFrame().
-    enum { UI_PANEL = 0, UI_KEYBOARD = 1, UI_LAYERS = 2 };
+    // in tracking space and its size in metres. With a radius (when canCurve()) the layer is
+    // bent instead: an arc of a cylinder of that radius about the quad's up axis, the axis
+    // `radius` in front of the face, the centre in the arc's middle and width_m along the arc.
+    // The image has a depth buffer. endUI() rebinds the window's framebuffer. One layer at a
+    // time, between beginFrame() and endFrame().
+    enum { UI_PANEL = 0, UI_KEYBOARD = 1, UI_WRIST = 2, UI_LAYERS = 3 };
     bool beginUI(int layer, int width, int height);
-    void endUI(const float centre[3], const float rot[4], float width_m, float height_m);
+    void endUI(const float centre[3], const float rot[4], float width_m, float height_m, float radius = 0.f);
 
     // Between beginUI() and endUI(): the layer's image as drawn so far, for a screenshot.
     // RGBA (premultiplied), bottom row first.

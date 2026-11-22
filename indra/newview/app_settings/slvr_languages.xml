@@ -23,7 +23,7 @@
       <key>keyboard_label</key><string>Keyboard layout:</string>
       <key>word_suggestions</key><string>Word suggestions and next-word prediction</string>
       <key>message_dot_private</key><string>Message dot only for private chats</string>
-      <key>smooth_turn</key><string>Smooth turning (off: 30 degree steps)</string>
+      <key>smooth_turn</key><string>Smooth turning (off: in steps)</string>
       <key>vignette_label</key><string>Comfort vignette:</string>
       <key>vignette_off</key><string>Off</string>
       <key>vignette_low</key><string>Low</string>
@@ -38,6 +38,34 @@
       <key>laser_purple</key><string>Purple</string>
       <key>laser_white</key><string>White</string>
       <key>laser_opacity</key><string>Laser opacity:</string>
+      <key>snap_angle_label</key><string>Turn step:</string>
+      <key>turn_speed</key><string>Smooth turn speed:</string>
+      <key>blink</key><string>Blink over snap turns and teleports</string>
+      <key>walk_direction_label</key><string>Walk towards:</string>
+      <key>walk_head</key><string>Where I look</string>
+      <key>walk_hand</key><string>Where my left hand points</string>
+      <key>left_handed</key><string>Left-handed (swap the controllers)</string>
+      <key>ignore_script_camera</key><string>Keep my eyes' view when scripts move the camera</string>
+      <key>eye_height_label</key><string>Eye height:</string>
+      <key>eye_height_avatar</key><string>Avatar's eyes</string>
+      <key>eye_height_mine</key><string>My own height</string>
+      <key>body_height</key><string>My height (m):</string>
+      <key>measure_height</key><string>Measure my height (stand up straight)</string>
+      <key>height_measured</key><string>Height measured:</string>
+      <key>height_not_measured</key><string>Could not measure: start VR and stand up straight.</string>
+      <key>haptics</key><string>Controller vibration</string>
+      <key>curved_panel</key><string>Curved panel</string>
+      <key>panel_follow</key><string>Panel follows my view</string>
+      <key>text_scale</key><string>Name tag size:</string>
+      <key>performance_preset</key><string>Lighter graphics in VR (smoother)</string>
+      <key>wrist_panel</key><string>Panel</string>
+      <key>wrist_chat</key><string>Chat</string>
+      <key>wrist_settings</key><string>Settings</string>
+      <key>wrist_screenshot</key><string>Photo</string>
+      <key>wrist_recenter</key><string>Recenter</string>
+      <key>wrist_fly</key><string>Fly</string>
+      <key>wrist_land</key><string>Land</string>
+      <key>wrist_stand</key><string>Stand up</string>
       <key>same_as_viewer</key><string>Same as Firestorm</string>
       <key>same_as_language</key><string>Same as SLVR language</string>
       <key>screenshot_saved</key><string>VR screenshot saved: [PATH]</string>
@@ -63,7 +91,7 @@
       <key>keyboard_label</key><string>Klavye düzeni:</string>
       <key>word_suggestions</key><string>Kelime önerileri ve sonraki kelime tahmini</string>
       <key>message_dot_private</key><string>Mesaj noktası yalnızca özel sohbetler için</string>
-      <key>smooth_turn</key><string>Kesintisiz dönüş (kapalıyken 30 derecelik adımlar)</string>
+      <key>smooth_turn</key><string>Kesintisiz dönüş (kapalıyken adım adım)</string>
       <key>vignette_label</key><string>Konfor vinyeti:</string>
       <key>vignette_off</key><string>Kapalı</string>
       <key>vignette_low</key><string>Düşük</string>
@@ -78,6 +106,34 @@
       <key>laser_purple</key><string>Mor</string>
       <key>laser_white</key><string>Beyaz</string>
       <key>laser_opacity</key><string>Lazer opaklığı:</string>
+      <key>snap_angle_label</key><string>Dönüş adımı:</string>
+      <key>turn_speed</key><string>Kesintisiz dönüş hızı:</string>
+      <key>blink</key><string>Adımlı dönüş ve ışınlanmada göz kırpma</string>
+      <key>walk_direction_label</key><string>Yürüme yönü:</string>
+      <key>walk_head</key><string>Baktığım yön</string>
+      <key>walk_hand</key><string>Sol elimin gösterdiği yön</string>
+      <key>left_handed</key><string>Solak (kumandaları değiştir)</string>
+      <key>ignore_script_camera</key><string>Scriptler kamerayı oynatınca gözümden bakmaya devam et</string>
+      <key>eye_height_label</key><string>Göz yüksekliği:</string>
+      <key>eye_height_avatar</key><string>Avatarın gözleri</string>
+      <key>eye_height_mine</key><string>Kendi boyum</string>
+      <key>body_height</key><string>Boyum (m):</string>
+      <key>measure_height</key><string>Boyumu ölç (dik dur)</string>
+      <key>height_measured</key><string>Ölçülen boy:</string>
+      <key>height_not_measured</key><string>Ölçülemedi: VR'ı başlatıp dik durun.</string>
+      <key>haptics</key><string>Kumanda titreşimi</string>
+      <key>curved_panel</key><string>Kavisli panel</string>
+      <key>panel_follow</key><string>Panel bakışımı takip etsin</string>
+      <key>text_scale</key><string>İsim etiketi boyutu:</string>
+      <key>performance_preset</key><string>VR'da hafif grafik (daha akıcı)</string>
+      <key>wrist_panel</key><string>Panel</string>
+      <key>wrist_chat</key><string>Sohbet</string>
+      <key>wrist_settings</key><string>Ayarlar</string>
+      <key>wrist_screenshot</key><string>Fotoğraf</string>
+      <key>wrist_recenter</key><string>Ortala</string>
+      <key>wrist_fly</key><string>Uç</string>
+      <key>wrist_land</key><string>İn</string>
+      <key>wrist_stand</key><string>Kalk</string>
       <key>same_as_viewer</key><string>Firestorm ile aynı</string>
       <key>same_as_language</key><string>SLVR diliyle aynı</string>
       <key>screenshot_saved</key><string>VR ekran görüntüsü kaydedildi: [PATH]</string>
@@ -103,7 +159,7 @@
       <key>keyboard_label</key><string>Klaviatura düzümü:</string>
       <key>word_suggestions</key><string>Söz təklifləri və növbəti söz proqnozu</string>
       <key>message_dot_private</key><string>Mesaj nöqtəsi yalnız şəxsi söhbətlər üçün</string>
-      <key>smooth_turn</key><string>Hamar dönmə (söndürüləndə 30 dərəcəlik addımlar)</string>
+      <key>smooth_turn</key><string>Hamar dönmə (söndürülü: addımlarla)</string>
       <key>vignette_label</key><string>Rahatlıq vinyeti:</string>
       <key>vignette_off</key><string>Söndürülüb</string>
       <key>vignette_low</key><string>Aşağı</string>
@@ -118,6 +174,34 @@
       <key>laser_purple</key><string>Bənövşəyi</string>
       <key>laser_white</key><string>Ağ</string>
       <key>laser_opacity</key><string>Lazer qeyri-şəffaflığı:</string>
+      <key>snap_angle_label</key><string>Dönmə addımı:</string>
+      <key>turn_speed</key><string>Hamar dönmə sürəti:</string>
+      <key>blink</key><string>Addımlı dönmə və teleportda göz qırpma</string>
+      <key>walk_direction_label</key><string>Yerimə istiqaməti:</string>
+      <key>walk_head</key><string>Baxdığım yer</string>
+      <key>walk_hand</key><string>Sol əlimin göstərdiyi yer</string>
+      <key>left_handed</key><string>Solaxay (kontrollerləri dəyiş)</string>
+      <key>ignore_script_camera</key><string>Skriptlər kameranı hərəkət etdirəndə gözlərimdən baxmağa davam et</string>
+      <key>eye_height_label</key><string>Göz hündürlüyü:</string>
+      <key>eye_height_avatar</key><string>Avatarın gözləri</string>
+      <key>eye_height_mine</key><string>Öz boyum</string>
+      <key>body_height</key><string>Boyum (m):</string>
+      <key>measure_height</key><string>Boyumu ölç (düz dayan)</string>
+      <key>height_measured</key><string>Ölçülən boy:</string>
+      <key>height_not_measured</key><string>Ölçmək olmadı: VR-ı başladıb düz dayanın.</string>
+      <key>haptics</key><string>Kontroller vibrasiyası</string>
+      <key>curved_panel</key><string>Əyri panel</string>
+      <key>panel_follow</key><string>Panel baxışımı izləsin</string>
+      <key>text_scale</key><string>Ad etiketinin ölçüsü:</string>
+      <key>performance_preset</key><string>VR-da yüngül qrafika (daha axıcı)</string>
+      <key>wrist_panel</key><string>Panel</string>
+      <key>wrist_chat</key><string>Söhbət</string>
+      <key>wrist_settings</key><string>Ayarlar</string>
+      <key>wrist_screenshot</key><string>Foto</string>
+      <key>wrist_recenter</key><string>Mərkəzlə</string>
+      <key>wrist_fly</key><string>Uç</string>
+      <key>wrist_land</key><string>En</string>
+      <key>wrist_stand</key><string>Qalx</string>
       <key>same_as_viewer</key><string>Firestorm ilə eyni</string>
       <key>same_as_language</key><string>SLVR dili ilə eyni</string>
       <key>screenshot_saved</key><string>VR ekran şəkli saxlanıldı: [PATH]</string>
@@ -143,7 +227,7 @@
       <key>keyboard_label</key><string>Tastaturlayout:</string>
       <key>word_suggestions</key><string>Ordforslag og forudsigelse af næste ord</string>
       <key>message_dot_private</key><string>Beskedprik kun for private samtaler</string>
-      <key>smooth_turn</key><string>Glidende drejning (fra: trin på 30 grader)</string>
+      <key>smooth_turn</key><string>Glidende drejning (fra: i trin)</string>
       <key>vignette_label</key><string>Komfortvignet:</string>
       <key>vignette_off</key><string>Fra</string>
       <key>vignette_low</key><string>Lav</string>
@@ -158,6 +242,34 @@
       <key>laser_purple</key><string>Lilla</string>
       <key>laser_white</key><string>Hvid</string>
       <key>laser_opacity</key><string>Laserens dækkevne:</string>
+      <key>snap_angle_label</key><string>Drejetrin:</string>
+      <key>turn_speed</key><string>Hastighed for glidende drejning:</string>
+      <key>blink</key><string>Blink ved trindrejning og teleport</string>
+      <key>walk_direction_label</key><string>Gå mod:</string>
+      <key>walk_head</key><string>Hvor jeg kigger</string>
+      <key>walk_hand</key><string>Hvor min venstre hånd peger</string>
+      <key>left_handed</key><string>Venstrehåndet (byt controllerne)</string>
+      <key>ignore_script_camera</key><string>Behold udsynet fra mine øjne, når scripts flytter kameraet</string>
+      <key>eye_height_label</key><string>Øjenhøjde:</string>
+      <key>eye_height_avatar</key><string>Avatarens øjne</string>
+      <key>eye_height_mine</key><string>Min egen højde</string>
+      <key>body_height</key><string>Min højde (m):</string>
+      <key>measure_height</key><string>Mål min højde (stå ret op)</string>
+      <key>height_measured</key><string>Målt højde:</string>
+      <key>height_not_measured</key><string>Kunne ikke måle: start VR og stå ret op.</string>
+      <key>haptics</key><string>Vibration i controllerne</string>
+      <key>curved_panel</key><string>Buet panel</string>
+      <key>panel_follow</key><string>Panelet følger mit blik</string>
+      <key>text_scale</key><string>Størrelse på navneskilte:</string>
+      <key>performance_preset</key><string>Lettere grafik i VR (mere flydende)</string>
+      <key>wrist_panel</key><string>Panel</string>
+      <key>wrist_chat</key><string>Chat</string>
+      <key>wrist_settings</key><string>Indstillinger</string>
+      <key>wrist_screenshot</key><string>Foto</string>
+      <key>wrist_recenter</key><string>Centrér</string>
+      <key>wrist_fly</key><string>Flyv</string>
+      <key>wrist_land</key><string>Land</string>
+      <key>wrist_stand</key><string>Rejs dig</string>
       <key>same_as_viewer</key><string>Samme som Firestorm</string>
       <key>same_as_language</key><string>Samme som SLVR-sprog</string>
       <key>screenshot_saved</key><string>VR-skærmbillede gemt: [PATH]</string>
@@ -183,7 +295,7 @@
       <key>keyboard_label</key><string>Tastaturlayout:</string>
       <key>word_suggestions</key><string>Wortvorschläge und Vorhersage des nächsten Worts</string>
       <key>message_dot_private</key><string>Nachrichtenpunkt nur für private Chats</string>
-      <key>smooth_turn</key><string>Stufenloses Drehen (aus: 30-Grad-Schritte)</string>
+      <key>smooth_turn</key><string>Stufenloses Drehen (aus: in Stufen)</string>
       <key>vignette_label</key><string>Komfort-Vignette:</string>
       <key>vignette_off</key><string>Aus</string>
       <key>vignette_low</key><string>Gering</string>
@@ -198,6 +310,34 @@
       <key>laser_purple</key><string>Lila</string>
       <key>laser_white</key><string>Weiß</string>
       <key>laser_opacity</key><string>Laser-Deckkraft:</string>
+      <key>snap_angle_label</key><string>Drehstufe:</string>
+      <key>turn_speed</key><string>Drehgeschwindigkeit:</string>
+      <key>blink</key><string>Abblenden bei Stufendrehung und Teleport</string>
+      <key>walk_direction_label</key><string>Gehen in Richtung:</string>
+      <key>walk_head</key><string>Blickrichtung</string>
+      <key>walk_hand</key><string>Wohin die linke Hand zeigt</string>
+      <key>left_handed</key><string>Linkshänder (Controller tauschen)</string>
+      <key>ignore_script_camera</key><string>Sicht aus meinen Augen behalten, wenn Skripte die Kamera bewegen</string>
+      <key>eye_height_label</key><string>Augenhöhe:</string>
+      <key>eye_height_avatar</key><string>Augen des Avatars</string>
+      <key>eye_height_mine</key><string>Meine eigene Größe</string>
+      <key>body_height</key><string>Meine Größe (m):</string>
+      <key>measure_height</key><string>Meine Größe messen (gerade stehen)</string>
+      <key>height_measured</key><string>Gemessene Größe:</string>
+      <key>height_not_measured</key><string>Messung nicht möglich: VR starten und gerade stehen.</string>
+      <key>haptics</key><string>Controller-Vibration</string>
+      <key>curved_panel</key><string>Gebogenes Panel</string>
+      <key>panel_follow</key><string>Panel folgt meinem Blick</string>
+      <key>text_scale</key><string>Größe der Namensschilder:</string>
+      <key>performance_preset</key><string>Leichtere Grafik in VR (flüssiger)</string>
+      <key>wrist_panel</key><string>Panel</string>
+      <key>wrist_chat</key><string>Chat</string>
+      <key>wrist_settings</key><string>Einstellungen</string>
+      <key>wrist_screenshot</key><string>Foto</string>
+      <key>wrist_recenter</key><string>Zentrieren</string>
+      <key>wrist_fly</key><string>Fliegen</string>
+      <key>wrist_land</key><string>Landen</string>
+      <key>wrist_stand</key><string>Aufstehen</string>
       <key>same_as_viewer</key><string>Wie Firestorm</string>
       <key>same_as_language</key><string>Wie SLVR-Sprache</string>
       <key>screenshot_saved</key><string>VR-Screenshot gespeichert: [PATH]</string>
@@ -223,7 +363,7 @@
       <key>keyboard_label</key><string>Distribución del teclado:</string>
       <key>word_suggestions</key><string>Sugerencias de palabras y predicción de la siguiente</string>
       <key>message_dot_private</key><string>Punto de mensaje solo para chats privados</string>
-      <key>smooth_turn</key><string>Giro suave (desactivado: pasos de 30 grados)</string>
+      <key>smooth_turn</key><string>Giro suave (desactivado: por pasos)</string>
       <key>vignette_label</key><string>Viñeta de confort:</string>
       <key>vignette_off</key><string>Desactivada</string>
       <key>vignette_low</key><string>Baja</string>
@@ -238,6 +378,34 @@
       <key>laser_purple</key><string>Morado</string>
       <key>laser_white</key><string>Blanco</string>
       <key>laser_opacity</key><string>Opacidad del láser:</string>
+      <key>snap_angle_label</key><string>Paso de giro:</string>
+      <key>turn_speed</key><string>Velocidad de giro suave:</string>
+      <key>blink</key><string>Parpadeo en giros por pasos y teletransportes</string>
+      <key>walk_direction_label</key><string>Caminar hacia:</string>
+      <key>walk_head</key><string>Donde miro</string>
+      <key>walk_hand</key><string>Donde apunta mi mano izquierda</string>
+      <key>left_handed</key><string>Zurdo (intercambiar los mandos)</string>
+      <key>ignore_script_camera</key><string>Mantener la vista desde mis ojos cuando un script mueve la cámara</string>
+      <key>eye_height_label</key><string>Altura de los ojos:</string>
+      <key>eye_height_avatar</key><string>Ojos del avatar</string>
+      <key>eye_height_mine</key><string>Mi propia altura</string>
+      <key>body_height</key><string>Mi altura (m):</string>
+      <key>measure_height</key><string>Medir mi altura (de pie y recto)</string>
+      <key>height_measured</key><string>Altura medida:</string>
+      <key>height_not_measured</key><string>No se pudo medir: inicia la RV y ponte de pie recto.</string>
+      <key>haptics</key><string>Vibración de los mandos</string>
+      <key>curved_panel</key><string>Panel curvo</string>
+      <key>panel_follow</key><string>El panel sigue mi mirada</string>
+      <key>text_scale</key><string>Tamaño de las etiquetas de nombre:</string>
+      <key>performance_preset</key><string>Gráficos más ligeros en RV (más fluido)</string>
+      <key>wrist_panel</key><string>Panel</string>
+      <key>wrist_chat</key><string>Chat</string>
+      <key>wrist_settings</key><string>Ajustes</string>
+      <key>wrist_screenshot</key><string>Foto</string>
+      <key>wrist_recenter</key><string>Centrar</string>
+      <key>wrist_fly</key><string>Volar</string>
+      <key>wrist_land</key><string>Aterrizar</string>
+      <key>wrist_stand</key><string>Levantarse</string>
       <key>same_as_viewer</key><string>Igual que Firestorm</string>
       <key>same_as_language</key><string>Igual que el idioma de SLVR</string>
       <key>screenshot_saved</key><string>Captura VR guardada: [PATH]</string>
@@ -263,7 +431,7 @@
       <key>keyboard_label</key><string>Disposition du clavier :</string>
       <key>word_suggestions</key><string>Suggestions de mots et prédiction du mot suivant</string>
       <key>message_dot_private</key><string>Point de message uniquement pour les discussions privées</string>
-      <key>smooth_turn</key><string>Rotation fluide (désactivée : par pas de 30 degrés)</string>
+      <key>smooth_turn</key><string>Rotation fluide (désactivée : par crans)</string>
       <key>vignette_label</key><string>Vignette de confort :</string>
       <key>vignette_off</key><string>Désactivée</string>
       <key>vignette_low</key><string>Faible</string>
@@ -278,6 +446,34 @@
       <key>laser_purple</key><string>Violet</string>
       <key>laser_white</key><string>Blanc</string>
       <key>laser_opacity</key><string>Opacité du laser :</string>
+      <key>snap_angle_label</key><string>Cran de rotation :</string>
+      <key>turn_speed</key><string>Vitesse de rotation fluide :</string>
+      <key>blink</key><string>Fondu au noir lors des rotations par crans et téléportations</string>
+      <key>walk_direction_label</key><string>Marcher vers :</string>
+      <key>walk_head</key><string>Là où je regarde</string>
+      <key>walk_hand</key><string>Là où pointe ma main gauche</string>
+      <key>left_handed</key><string>Gaucher (inverser les manettes)</string>
+      <key>ignore_script_camera</key><string>Garder la vue de mes yeux quand un script déplace la caméra</string>
+      <key>eye_height_label</key><string>Hauteur des yeux :</string>
+      <key>eye_height_avatar</key><string>Yeux de l'avatar</string>
+      <key>eye_height_mine</key><string>Ma propre taille</string>
+      <key>body_height</key><string>Ma taille (m) :</string>
+      <key>measure_height</key><string>Mesurer ma taille (debout, bien droit)</string>
+      <key>height_measured</key><string>Taille mesurée :</string>
+      <key>height_not_measured</key><string>Mesure impossible : lancez la VR et tenez-vous droit.</string>
+      <key>haptics</key><string>Vibration des manettes</string>
+      <key>curved_panel</key><string>Panneau incurvé</string>
+      <key>panel_follow</key><string>Le panneau suit mon regard</string>
+      <key>text_scale</key><string>Taille des étiquettes de nom :</string>
+      <key>performance_preset</key><string>Graphismes allégés en VR (plus fluide)</string>
+      <key>wrist_panel</key><string>Panneau</string>
+      <key>wrist_chat</key><string>Chat</string>
+      <key>wrist_settings</key><string>Réglages</string>
+      <key>wrist_screenshot</key><string>Photo</string>
+      <key>wrist_recenter</key><string>Recentrer</string>
+      <key>wrist_fly</key><string>Voler</string>
+      <key>wrist_land</key><string>Atterrir</string>
+      <key>wrist_stand</key><string>Se lever</string>
       <key>same_as_viewer</key><string>Comme Firestorm</string>
       <key>same_as_language</key><string>Comme la langue de SLVR</string>
       <key>screenshot_saved</key><string>Capture VR enregistrée : [PATH]</string>
@@ -303,7 +499,7 @@
       <key>keyboard_label</key><string>Layout tastiera:</string>
       <key>word_suggestions</key><string>Suggerimenti di parole e previsione della successiva</string>
       <key>message_dot_private</key><string>Punto messaggi solo per le chat private</string>
-      <key>smooth_turn</key><string>Rotazione fluida (disattivata: scatti di 30 gradi)</string>
+      <key>smooth_turn</key><string>Rotazione fluida (disattivata: a scatti)</string>
       <key>vignette_label</key><string>Vignettatura di comfort:</string>
       <key>vignette_off</key><string>Disattivata</string>
       <key>vignette_low</key><string>Bassa</string>
@@ -318,6 +514,34 @@
       <key>laser_purple</key><string>Viola</string>
       <key>laser_white</key><string>Bianco</string>
       <key>laser_opacity</key><string>Opacità del laser:</string>
+      <key>snap_angle_label</key><string>Scatto di rotazione:</string>
+      <key>turn_speed</key><string>Velocità di rotazione fluida:</string>
+      <key>blink</key><string>Dissolvenza nelle rotazioni a scatti e nei teletrasporti</string>
+      <key>walk_direction_label</key><string>Cammina verso:</string>
+      <key>walk_head</key><string>Dove guardo</string>
+      <key>walk_hand</key><string>Dove punta la mano sinistra</string>
+      <key>left_handed</key><string>Mancino (scambia i controller)</string>
+      <key>ignore_script_camera</key><string>Mantieni la vista dai miei occhi quando uno script muove la telecamera</string>
+      <key>eye_height_label</key><string>Altezza degli occhi:</string>
+      <key>eye_height_avatar</key><string>Occhi dell'avatar</string>
+      <key>eye_height_mine</key><string>La mia altezza</string>
+      <key>body_height</key><string>La mia altezza (m):</string>
+      <key>measure_height</key><string>Misura la mia altezza (in piedi, dritto)</string>
+      <key>height_measured</key><string>Altezza misurata:</string>
+      <key>height_not_measured</key><string>Misura non riuscita: avvia la VR e stai dritto.</string>
+      <key>haptics</key><string>Vibrazione dei controller</string>
+      <key>curved_panel</key><string>Pannello curvo</string>
+      <key>panel_follow</key><string>Il pannello segue il mio sguardo</string>
+      <key>text_scale</key><string>Dimensione delle etichette dei nomi:</string>
+      <key>performance_preset</key><string>Grafica più leggera in VR (più fluida)</string>
+      <key>wrist_panel</key><string>Pannello</string>
+      <key>wrist_chat</key><string>Chat</string>
+      <key>wrist_settings</key><string>Impostazioni</string>
+      <key>wrist_screenshot</key><string>Foto</string>
+      <key>wrist_recenter</key><string>Ricentra</string>
+      <key>wrist_fly</key><string>Vola</string>
+      <key>wrist_land</key><string>Atterra</string>
+      <key>wrist_stand</key><string>Alzati</string>
       <key>same_as_viewer</key><string>Come Firestorm</string>
       <key>same_as_language</key><string>Come la lingua di SLVR</string>
       <key>screenshot_saved</key><string>Screenshot VR salvato: [PATH]</string>
@@ -343,7 +567,7 @@
       <key>keyboard_label</key><string>Układ klawiatury:</string>
       <key>word_suggestions</key><string>Podpowiedzi słów i przewidywanie następnego słowa</string>
       <key>message_dot_private</key><string>Kropka wiadomości tylko dla prywatnych rozmów</string>
-      <key>smooth_turn</key><string>Płynny obrót (wyłączony: skoki co 30 stopni)</string>
+      <key>smooth_turn</key><string>Płynny obrót (wył.: skokowo)</string>
       <key>vignette_label</key><string>Winieta komfortu:</string>
       <key>vignette_off</key><string>Wyłączona</string>
       <key>vignette_low</key><string>Niska</string>
@@ -358,6 +582,34 @@
       <key>laser_purple</key><string>Fioletowy</string>
       <key>laser_white</key><string>Biały</string>
       <key>laser_opacity</key><string>Krycie lasera:</string>
+      <key>snap_angle_label</key><string>Skok obrotu:</string>
+      <key>turn_speed</key><string>Prędkość płynnego obrotu:</string>
+      <key>blink</key><string>Mrugnięcie przy obrocie skokowym i teleportacji</string>
+      <key>walk_direction_label</key><string>Idź w stronę:</string>
+      <key>walk_head</key><string>Gdzie patrzę</string>
+      <key>walk_hand</key><string>Gdzie wskazuje lewa ręka</string>
+      <key>left_handed</key><string>Leworęczny (zamień kontrolery)</string>
+      <key>ignore_script_camera</key><string>Zachowaj widok z moich oczu, gdy skrypt porusza kamerą</string>
+      <key>eye_height_label</key><string>Wysokość oczu:</string>
+      <key>eye_height_avatar</key><string>Oczy awatara</string>
+      <key>eye_height_mine</key><string>Mój własny wzrost</string>
+      <key>body_height</key><string>Mój wzrost (m):</string>
+      <key>measure_height</key><string>Zmierz mój wzrost (stań prosto)</string>
+      <key>height_measured</key><string>Zmierzony wzrost:</string>
+      <key>height_not_measured</key><string>Nie udało się zmierzyć: uruchom VR i stań prosto.</string>
+      <key>haptics</key><string>Wibracje kontrolerów</string>
+      <key>curved_panel</key><string>Zakrzywiony panel</string>
+      <key>panel_follow</key><string>Panel podąża za wzrokiem</string>
+      <key>text_scale</key><string>Rozmiar etykiet z imionami:</string>
+      <key>performance_preset</key><string>Lżejsza grafika w VR (płynniej)</string>
+      <key>wrist_panel</key><string>Panel</string>
+      <key>wrist_chat</key><string>Czat</string>
+      <key>wrist_settings</key><string>Ustawienia</string>
+      <key>wrist_screenshot</key><string>Zdjęcie</string>
+      <key>wrist_recenter</key><string>Wyśrodkuj</string>
+      <key>wrist_fly</key><string>Leć</string>
+      <key>wrist_land</key><string>Wyląduj</string>
+      <key>wrist_stand</key><string>Wstań</string>
       <key>same_as_viewer</key><string>Jak w Firestorm</string>
       <key>same_as_language</key><string>Jak język SLVR</string>
       <key>screenshot_saved</key><string>Zapisano zrzut ekranu VR: [PATH]</string>
@@ -383,7 +635,7 @@
       <key>keyboard_label</key><string>Layout do teclado:</string>
       <key>word_suggestions</key><string>Sugestões de palavras e previsão da próxima</string>
       <key>message_dot_private</key><string>Ponto de mensagem só para conversas privadas</string>
-      <key>smooth_turn</key><string>Giro suave (desligado: passos de 30 graus)</string>
+      <key>smooth_turn</key><string>Rotação suave (desligada: por passos)</string>
       <key>vignette_label</key><string>Vinheta de conforto:</string>
       <key>vignette_off</key><string>Desligada</string>
       <key>vignette_low</key><string>Baixa</string>
@@ -398,6 +650,34 @@
       <key>laser_purple</key><string>Roxo</string>
       <key>laser_white</key><string>Branco</string>
       <key>laser_opacity</key><string>Opacidade do laser:</string>
+      <key>snap_angle_label</key><string>Passo de rotação:</string>
+      <key>turn_speed</key><string>Velocidade da rotação suave:</string>
+      <key>blink</key><string>Piscar nas rotações por passos e teletransportes</string>
+      <key>walk_direction_label</key><string>Andar para:</string>
+      <key>walk_head</key><string>Onde olho</string>
+      <key>walk_hand</key><string>Onde a mão esquerda aponta</string>
+      <key>left_handed</key><string>Canhoto (trocar os controles)</string>
+      <key>ignore_script_camera</key><string>Manter a visão dos meus olhos quando um script move a câmera</string>
+      <key>eye_height_label</key><string>Altura dos olhos:</string>
+      <key>eye_height_avatar</key><string>Olhos do avatar</string>
+      <key>eye_height_mine</key><string>Minha própria altura</string>
+      <key>body_height</key><string>Minha altura (m):</string>
+      <key>measure_height</key><string>Medir minha altura (fique em pé, reto)</string>
+      <key>height_measured</key><string>Altura medida:</string>
+      <key>height_not_measured</key><string>Não foi possível medir: inicie a RV e fique em pé, reto.</string>
+      <key>haptics</key><string>Vibração dos controles</string>
+      <key>curved_panel</key><string>Painel curvo</string>
+      <key>panel_follow</key><string>O painel segue meu olhar</string>
+      <key>text_scale</key><string>Tamanho das etiquetas de nome:</string>
+      <key>performance_preset</key><string>Gráficos mais leves em RV (mais fluido)</string>
+      <key>wrist_panel</key><string>Painel</string>
+      <key>wrist_chat</key><string>Chat</string>
+      <key>wrist_settings</key><string>Ajustes</string>
+      <key>wrist_screenshot</key><string>Foto</string>
+      <key>wrist_recenter</key><string>Centralizar</string>
+      <key>wrist_fly</key><string>Voar</string>
+      <key>wrist_land</key><string>Pousar</string>
+      <key>wrist_stand</key><string>Levantar</string>
       <key>same_as_viewer</key><string>Igual ao Firestorm</string>
       <key>same_as_language</key><string>Igual ao idioma do SLVR</string>
       <key>screenshot_saved</key><string>Captura VR salva: [PATH]</string>
@@ -423,7 +703,7 @@
       <key>keyboard_label</key><string>Раскладка клавиатуры:</string>
       <key>word_suggestions</key><string>Подсказки слов и предсказание следующего слова</string>
       <key>message_dot_private</key><string>Точка сообщений только для личных чатов</string>
-      <key>smooth_turn</key><string>Плавный поворот (выкл.: шагами по 30 градусов)</string>
+      <key>smooth_turn</key><string>Плавный поворот (выкл.: шагами)</string>
       <key>vignette_label</key><string>Виньетка комфорта:</string>
       <key>vignette_off</key><string>Выкл.</string>
       <key>vignette_low</key><string>Слабая</string>
@@ -438,6 +718,34 @@
       <key>laser_purple</key><string>Фиолетовый</string>
       <key>laser_white</key><string>Белый</string>
       <key>laser_opacity</key><string>Непрозрачность лазера:</string>
+      <key>snap_angle_label</key><string>Шаг поворота:</string>
+      <key>turn_speed</key><string>Скорость плавного поворота:</string>
+      <key>blink</key><string>Затемнение при шаговом повороте и телепорте</string>
+      <key>walk_direction_label</key><string>Идти туда:</string>
+      <key>walk_head</key><string>Куда смотрю</string>
+      <key>walk_hand</key><string>Куда указывает левая рука</string>
+      <key>left_handed</key><string>Левша (поменять контроллеры)</string>
+      <key>ignore_script_camera</key><string>Сохранять вид из глаз, когда скрипт двигает камеру</string>
+      <key>eye_height_label</key><string>Высота глаз:</string>
+      <key>eye_height_avatar</key><string>Глаза аватара</string>
+      <key>eye_height_mine</key><string>Мой рост</string>
+      <key>body_height</key><string>Мой рост (м):</string>
+      <key>measure_height</key><string>Измерить мой рост (встаньте прямо)</string>
+      <key>height_measured</key><string>Измеренный рост:</string>
+      <key>height_not_measured</key><string>Не удалось измерить: запустите VR и встаньте прямо.</string>
+      <key>haptics</key><string>Вибрация контроллеров</string>
+      <key>curved_panel</key><string>Изогнутая панель</string>
+      <key>panel_follow</key><string>Панель следует за взглядом</string>
+      <key>text_scale</key><string>Размер табличек с именами:</string>
+      <key>performance_preset</key><string>Облегчённая графика в VR (плавнее)</string>
+      <key>wrist_panel</key><string>Панель</string>
+      <key>wrist_chat</key><string>Чат</string>
+      <key>wrist_settings</key><string>Настройки</string>
+      <key>wrist_screenshot</key><string>Фото</string>
+      <key>wrist_recenter</key><string>Центр</string>
+      <key>wrist_fly</key><string>Лететь</string>
+      <key>wrist_land</key><string>Посадка</string>
+      <key>wrist_stand</key><string>Встать</string>
       <key>same_as_viewer</key><string>Как в Firestorm</string>
       <key>same_as_language</key><string>Как язык SLVR</string>
       <key>screenshot_saved</key><string>Снимок VR сохранён: [PATH]</string>
@@ -457,7 +765,7 @@
       <key>keyboard_label</key><string>キーボード配列:</string>
       <key>word_suggestions</key><string>単語の候補と次の単語の予測</string>
       <key>message_dot_private</key><string>メッセージの点は個人チャットのみ</string>
-      <key>smooth_turn</key><string>スムーズターン (オフ: 30度ずつ回転)</string>
+      <key>smooth_turn</key><string>スムーズ回転（オフ：段階回転）</string>
       <key>vignette_label</key><string>快適ビネット:</string>
       <key>vignette_off</key><string>オフ</string>
       <key>vignette_low</key><string>弱</string>
@@ -472,6 +780,34 @@
       <key>laser_purple</key><string>紫</string>
       <key>laser_white</key><string>白</string>
       <key>laser_opacity</key><string>レーザーの不透明度:</string>
+      <key>snap_angle_label</key><string>回転の角度:</string>
+      <key>turn_speed</key><string>スムーズ回転の速さ:</string>
+      <key>blink</key><string>段階回転とテレポートで暗転</string>
+      <key>walk_direction_label</key><string>歩く方向:</string>
+      <key>walk_head</key><string>見ている方向</string>
+      <key>walk_hand</key><string>左手が指す方向</string>
+      <key>left_handed</key><string>左利き（コントローラーを入れ替え）</string>
+      <key>ignore_script_camera</key><string>スクリプトがカメラを動かしても自分の目の視点を保つ</string>
+      <key>eye_height_label</key><string>目の高さ:</string>
+      <key>eye_height_avatar</key><string>アバターの目</string>
+      <key>eye_height_mine</key><string>自分の身長</string>
+      <key>body_height</key><string>身長 (m):</string>
+      <key>measure_height</key><string>身長を測る（まっすぐ立って）</string>
+      <key>height_measured</key><string>測定した身長:</string>
+      <key>height_not_measured</key><string>測定できません：VRを開始してまっすぐ立ってください。</string>
+      <key>haptics</key><string>コントローラーの振動</string>
+      <key>curved_panel</key><string>曲面パネル</string>
+      <key>panel_follow</key><string>パネルが視線についてくる</string>
+      <key>text_scale</key><string>名前タグの大きさ:</string>
+      <key>performance_preset</key><string>VRでは軽いグラフィック（より滑らか）</string>
+      <key>wrist_panel</key><string>パネル</string>
+      <key>wrist_chat</key><string>チャット</string>
+      <key>wrist_settings</key><string>設定</string>
+      <key>wrist_screenshot</key><string>写真</string>
+      <key>wrist_recenter</key><string>中央に戻す</string>
+      <key>wrist_fly</key><string>飛ぶ</string>
+      <key>wrist_land</key><string>着地</string>
+      <key>wrist_stand</key><string>立つ</string>
       <key>same_as_viewer</key><string>Firestormと同じ</string>
       <key>same_as_language</key><string>SLVRの言語と同じ</string>
       <key>screenshot_saved</key><string>VRスクリーンショットを保存しました: [PATH]</string>
@@ -491,7 +827,7 @@
       <key>keyboard_label</key><string>键盘布局:</string>
       <key>word_suggestions</key><string>单词建议与下一个词预测</string>
       <key>message_dot_private</key><string>消息提示点仅用于私聊</string>
-      <key>smooth_turn</key><string>平滑转向 (关闭时: 每次30度)</string>
+      <key>smooth_turn</key><string>平滑转向（关闭：分段转向）</string>
       <key>vignette_label</key><string>舒适晕影:</string>
       <key>vignette_off</key><string>关闭</string>
       <key>vignette_low</key><string>低</string>
@@ -506,6 +842,34 @@
       <key>laser_purple</key><string>紫色</string>
       <key>laser_white</key><string>白色</string>
       <key>laser_opacity</key><string>激光不透明度:</string>
+      <key>snap_angle_label</key><string>转向角度:</string>
+      <key>turn_speed</key><string>平滑转向速度:</string>
+      <key>blink</key><string>分段转向和传送时黑屏过渡</string>
+      <key>walk_direction_label</key><string>行走方向:</string>
+      <key>walk_head</key><string>我看的方向</string>
+      <key>walk_hand</key><string>左手指向的方向</string>
+      <key>left_handed</key><string>左撇子（交换手柄）</string>
+      <key>ignore_script_camera</key><string>脚本移动摄像机时保持我的眼睛视角</string>
+      <key>eye_height_label</key><string>眼睛高度:</string>
+      <key>eye_height_avatar</key><string>化身的眼睛</string>
+      <key>eye_height_mine</key><string>我自己的身高</string>
+      <key>body_height</key><string>我的身高 (米):</string>
+      <key>measure_height</key><string>测量我的身高（站直）</string>
+      <key>height_measured</key><string>测得身高:</string>
+      <key>height_not_measured</key><string>无法测量：请启动 VR 并站直。</string>
+      <key>haptics</key><string>手柄振动</string>
+      <key>curved_panel</key><string>曲面面板</string>
+      <key>panel_follow</key><string>面板跟随视线</string>
+      <key>text_scale</key><string>名字标签大小:</string>
+      <key>performance_preset</key><string>VR 中使用较轻的画质（更流畅）</string>
+      <key>wrist_panel</key><string>面板</string>
+      <key>wrist_chat</key><string>聊天</string>
+      <key>wrist_settings</key><string>设置</string>
+      <key>wrist_screenshot</key><string>拍照</string>
+      <key>wrist_recenter</key><string>回正</string>
+      <key>wrist_fly</key><string>飞行</string>
+      <key>wrist_land</key><string>降落</string>
+      <key>wrist_stand</key><string>站起</string>
       <key>same_as_viewer</key><string>与Firestorm相同</string>
       <key>same_as_language</key><string>与SLVR语言相同</string>
       <key>screenshot_saved</key><string>VR截图已保存: [PATH]</string>

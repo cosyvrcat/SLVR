@@ -26,6 +26,7 @@
 #include <vector>
 
 class LLChat;
+class LLColor4;
 class LLFloater;
 class LLView;
 
@@ -70,6 +71,14 @@ public:
     // included, as a PNG in Pictures\SLVR.
     void requestScreenshot();
 
+    // LLViewerCamera::getPixelVectors() hook: how much larger than on the flat screen text in
+    // the world (name tags, chat bubbles) is drawn in the headset (SLVRWorldTextScale).
+    F32 worldTextScale() const;
+
+    // The settings window's "measure my height": the user's height from how high the eyes
+    // are above the floor while standing. False when VR is off or the runtime knows no floor.
+    bool measureHeight(F32& body_height);
+
     void shutdown();
 
 private:
@@ -92,6 +101,23 @@ private:
     void drawLaser(const LLVector3& start, const LLVector3& dir, F32 length);
     void updateVignette(F32 yaw);
     void drawVignette();
+    void drawBlink();
+    void blink();
+    void buzz(S32 hand, F32 amplitude, F32 seconds);
+    void recenter();
+    void followPanel();
+    void updateArc(const float pos[3], const float dir[3]);
+    void drawArc();
+    void drawControllers();
+    void updateWrist();
+    bool pointAtWrist(const float pos[3], const float dir[3], F32& length);
+    void drawWrist();
+    void pressWrist();
+    void applyGraphics(bool vr);
+    F32 panelRadius() const; // the panel is bent round the eyes at this radius, or flat: 0
+    static bool hitCylinder(const float centre[3], const float rot[4], F32 width, F32 height, F32 radius, S32 image_width,
+                            S32 image_height, const float pos[3], const float dir[3], S32& x, S32& y, F32& distance);
+    static void checkCurve();
     // A screenshot's quad layers: their image and where they were.
     struct ShotLayer
     {
@@ -99,6 +125,7 @@ private:
         int width = 0, height = 0;
         float centre[3] = {}, rot[4] = {};
         F32 width_m = 0.f, height_m = 0.f;
+        F32 radius = 0.f; // bent round the eyes, see LLVRBackend::endUI()
     };
     void drawPanel(ShotLayer* shot);
     void drawChatOnly();
@@ -109,7 +136,7 @@ private:
     void drawKeyboard(ShotLayer* shot);
     void showSettings();
     void saveScreenshot(ShotLayer eye_image, ShotLayer panel, ShotLayer keyboard);
-    void drawMessageDot();
+    void drawMessageDot(F32 aside, const LLColor4& colour);
     void applyInput();
     static void onIdle(void* self);
 
@@ -151,6 +178,28 @@ private:
     F32 mLeftLaserLength = 0.f;
     S32 mLeftPointerX = 0, mLeftPointerY = 0;
     bool mMenuDown = false, mTriggerDown = false, mGripDown = false, mZoomDown = false, mTurned = false;
+    bool mTalkDown = false;     // B held: push to talk
+    bool mRunning = false;      // the left stick is pushed all the way: running
+    bool mSnapped = false;      // a snap turn this frame, which the vignette leaves out
+    LLFrameTimer mRecenterTimer; // X held for this long
+    bool mRecentered = false;    // and that recentred, once per hold
+    bool mOwnZoom = false;       // the zoom camera is SLVR's own, not a script's (see beginEye())
+    F32 mBlink = 0.f;            // how dark the view is, 1 black: fading back in after a jump
+    bool mGraphicsApplied = false; // the lighter VR graphics are in effect, see applyGraphics()
+    // What the lasers were on last frame, for the tick as they move onto a key or a control.
+    LLVRKeyboard::Hit mHoverKey[2];
+    const void* mHoverView = nullptr; // a button or menu item of the panel
+    S32 mHoverWrist = -1;
+    // Teleport arc (A held): where it flies, agent coordinates, and where it lands if it may.
+    std::vector<LLVector3> mArc;
+    bool mArcAiming = false, mArcValid = false, mTeleportDown = false;
+    LLVector3 mArcTarget, mArcNormal;
+    // Wrist menu: a small quad over the other hand when its face is turned to the eyes.
+    bool mWristShown = false, mTriggerOnWrist = false;
+    S32 mWristItem = -1;        // item under the laser, or -1
+    S32 mWristX = 0, mWristY = 0;
+    float mWristCentre[3] = {}, mWristRot[4] = { 0.f, 0.f, 0.f, 1.f };
+    bool mPanelFollowing = false; // the panel glides back in front of the eyes (SLVRPanelFollow)
     bool mTriggerOnPanel = false, mGripOnPanel = false, mGripOnKeyboard = false; // where the press went; its release follows
     bool mTriggerOnKeyboard = false, mZoomOnKeyboard = false;
     bool mZoomStarted = false;  // the left trigger was held long enough to zoom
@@ -177,6 +226,7 @@ private:
     // keyboard focus. Hands are 0 right, 1 left.
     LLVRKeyboard mKeyboard;
     bool mKeyboardShown = false;
+    F32 mKeyboardAhead = 0.5f; // metres from the eyes where it appears
     float mKeyboardCentre[3] = { 0.f, -0.3f, -0.5f };
     float mKeyboardRot[4] = { 0.f, 0.f, 0.f, 1.f };
     F32 mKeyboardWidth = 0.55f;
