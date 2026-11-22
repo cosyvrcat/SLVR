@@ -73,6 +73,9 @@ This repository holds **source code only**. No builds are published here.
 - A chat-only mode that shows just the conversation window, and a glowing dot for unread
   messages (private chats only by default).
 - A left-handed mode that swaps the controllers.
+- Your real controllers in your hands: Meta Quest Touch Plus models, textured, from Meta's
+  own controller art (see [Controller models](#controller-models)). Without them, simple
+  boxes show where your hands are.
 - VR screenshots of what the right eye sees, panel and keyboard included, saved as PNG files
   to `Pictures\SLVR`.
 
@@ -121,6 +124,23 @@ To switch VR on or off, use **World > VR Headset** or **Ctrl+Alt+F7**. All optio
 - A capable GPU: Second Life renders every frame twice in VR. Development uses an RTX 3060
   Laptop GPU.
 
+## Controller models
+
+The controller models belong to Meta and are not part of this repository. To see them in VR:
+
+1. Download **Meta Quest Hardware Art** from
+   [Meta's developer site](https://developers.meta.com/vr/downloads/package/oculus-controller-art/)
+   and unpack it.
+2. Run the converter, which needs only Python 3:
+   ```
+   python scripts/slvr/convert_controller_models.py <unpacked folder>
+   ```
+   It writes the Touch Plus models into `%APPDATA%\SLVR_x64\user_settings\vr_controllers`.
+   SLVR picks them up the next time VR starts.
+
+Meta allows the art to be used to show the matching controller in a VR application. See
+the attribution file in the package.
+
 ## Building
 
 SLVR builds exactly like Firestorm. The steps are in [doc/building_windows.md](doc/building_windows.md).
@@ -151,6 +171,7 @@ the headset before the next one builds on it.
 
 | Version | What it added |
 | --- | --- |
+| 0.6.1 | Meta Quest Touch Plus controller models |
 | 0.6.0 | Arc teleport, push-to-talk, recentring, running, haptics, wrist menu, curved panel, left-handed mode, own-height mode, script camera guard, VR text scale, lighter VR graphics, two-column settings |
 | 0.5.5 | Smooth turning, comfort vignette, laser colour and opacity |
 | 0.5.4 | See-through HUDs; panel, dialogs and keyboard open where you look |
