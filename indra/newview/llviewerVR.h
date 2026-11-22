@@ -71,10 +71,6 @@ public:
     // included, as a PNG in Pictures\SLVR.
     void requestScreenshot();
 
-    // LLViewerCamera::getPixelVectors() hook: how much larger than on the flat screen text in
-    // the world (name tags, chat bubbles) is drawn in the headset (SLVRWorldTextScale).
-    F32 worldTextScale() const;
-
     // The settings window's "measure my height": the user's height from how high the eyes
     // are above the floor while standing. False when VR is off or the runtime knows no floor.
     bool measureHeight(F32& body_height);
@@ -97,6 +93,9 @@ private:
     void releaseKeyboard(S32 hand);
     void showChat();
     void placePanel(const LLView* around);
+    void windowOffset(const LLView* window, F32& dx, F32& dy) const;
+    bool startTitleDrag(LLView* title);
+    bool gazePoint(S32& x, S32& y) const;
     void noteMessage(const LLUUID& from);
     void drawLaser(const LLVector3& start, const LLVector3& dir, F32 length);
     void updateVignette(F32 yaw);
@@ -113,7 +112,7 @@ private:
     bool pointAtWrist(const float pos[3], const float dir[3], F32& length);
     void drawWrist();
     void pressWrist();
-    void applyGraphics(bool vr);
+    void applyGraphics(bool in_vr);
     F32 panelRadius() const; // the panel is bent round the eyes at this radius, or flat: 0
     static bool hitCylinder(const float centre[3], const float rot[4], F32 width, F32 height, F32 radius, S32 image_width,
                             S32 image_height, const float pos[3], const float dir[3], S32& x, S32& y, F32& distance);
@@ -180,6 +179,15 @@ private:
     bool mMenuDown = false, mTriggerDown = false, mGripDown = false, mZoomDown = false, mTurned = false;
     bool mTalkDown = false;     // B held: push to talk
     bool mRunning = false;      // the left stick is pushed all the way: running
+    LLFrameTimer mRunTimer;     // since it was pushed all the way
+    bool mMenuPlaced = false;   // the context menu the right grip opened on the hidden panel was put where the eyes look
+    bool mTriggerClosedMenu = false; // the trigger press only closed an open menu; its release goes nowhere either
+    // With only the chat or the popped windows shown, a window's title bar dragged by the
+    // trigger carries the panel round the eyes (see startTitleDrag()): offsets of the window
+    // from the laser's point, as seen from the eyes, its distance, and its middle on the panel.
+    bool mTitleDrag = false;
+    F32 mTitleDragHeading = 0.f, mTitleDragPitch = 0.f, mTitleDragAlong = 0.f, mTitleDragDistance = 1.f;
+    F32 mTitleDragX = 0.f, mTitleDragY = 0.f;
     bool mSnapped = false;      // a snap turn this frame, which the vignette leaves out
     LLFrameTimer mRecenterTimer; // X held for this long
     bool mRecentered = false;    // and that recentred, once per hold
@@ -226,6 +234,7 @@ private:
     // keyboard focus. Hands are 0 right, 1 left.
     LLVRKeyboard mKeyboard;
     bool mKeyboardShown = false;
+    bool mKeyboardWanted = false; // a text field was pressed, see updateKeyboard()
     F32 mKeyboardAhead = 0.5f; // metres from the eyes where it appears
     float mKeyboardCentre[3] = { 0.f, -0.3f, -0.5f };
     float mKeyboardRot[4] = { 0.f, 0.f, 0.f, 1.f };
@@ -253,6 +262,7 @@ private:
     // Comfort vignette (see updateVignette()): how far it has closed in, 0 open to 1 at its
     // setting's size, and last frame's view, which it compares against.
     F32 mVignette = 0.f;
+    F32 mVignetteHeld = 0.f, mVignetteHeldFor = 0.f; // see holdPeak()
     bool mMotionValid = false, mMotionFirstPerson = false;
     LLVector3 mMotionOrigin;
     F32 mMotionYaw = 0.f;

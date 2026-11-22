@@ -17,6 +17,7 @@
 #include "llbutton.h"
 #include "llcallbacklist.h"
 #include "llchat.h"
+#include "lldraghandle.h"
 #include "llfocusmgr.h"
 #include "llfloater.h"
 #include "llfloaterreg.h"
@@ -170,14 +171,13 @@ namespace
         out[3] = cy * cp;
     }
 
-    // Puts a quad `distance` metres along the line of sight from the eyes (tracking space),
-    // square on to it, with the point `dx`, `dy` metres from its middle (in its own plane,
-    // right and up) on that line.
-    void placeAhead(const float eyes[3], const float eye_rot[4], F32 distance, F32 dx, F32 dy, float centre[3], float rot[4])
+    // Puts a quad `distance` metres along `look` (a unit vector) from the eyes (tracking
+    // space), square on to it, with the point `dx`, `dy` metres from its middle (in its own
+    // plane, right and up) on that line.
+    void placeAlong(const float eyes[3], const float look[3], F32 distance, F32 dx, F32 dy, float centre[3], float rot[4])
     {
-        const float FORWARD[3] = { 0.f, 0.f, -1.f }, RIGHT[3] = { 1.f, 0.f, 0.f }, UP[3] = { 0.f, 1.f, 0.f };
-        float look[3], right[3], up[3];
-        rotate(eye_rot, FORWARD, look);
+        const float RIGHT[3] = { 1.f, 0.f, 0.f }, UP[3] = { 0.f, 1.f, 0.f };
+        float right[3], up[3];
         facing(look, rot);
         rotate(rot, RIGHT, right);
         rotate(rot, UP, up);
@@ -185,6 +185,57 @@ namespace
         {
             centre[i] = eyes[i] + look[i] * distance - right[i] * dx - up[i] * dy;
         }
+    }
+
+    // The same along the line of sight.
+    void placeAhead(const float eyes[3], const float eye_rot[4], F32 distance, F32 dx, F32 dy, float centre[3], float rot[4])
+    {
+        const float FORWARD[3] = { 0.f, 0.f, -1.f };
+        float look[3];
+        rotate(eye_rot, FORWARD, look);
+        placeAlong(eyes, look, distance, dx, dy, centre, rot);
+    }
+
+    // Heading and pitch of a direction in tracking space (not necessarily a unit vector), and back.
+    F32 headingOf(const float v[3]) { return atan2f(-v[0], -v[2]); }
+    F32 pitchOf(const float v[3]) { return atan2f(v[1], sqrtf(v[0] * v[0] + v[2] * v[2])); }
+    void direction(F32 heading, F32 pitch, float out[3])
+    {
+        out[0] = -sinf(heading) * cosf(pitch);
+        out[1] = sinf(pitch);
+        out[2] = -cosf(heading) * cosf(pitch);
+    }
+
+    // The on-screen keyboard comes up low in front, where seated hands type without lifting
+    // the arms: straight ahead of the face (its heading only), this far below the eyes'
+    // level, square on to the eyes, so it leans back like a laptop's keyboard.
+    const F32 KEYBOARD_BELOW = 40.f * DEG_TO_RAD;
+
+    // What a press at a point of the UI (window pixels) lands on: a field that takes text, a
+    // window's title bar, or something else.
+    enum class Pressed { TEXT, TITLE, OTHER };
+    Pressed pressedAt(S32 x, S32 y, LLView** title = nullptr)
+    {
+        const LLVector2 scale = gViewerWindow->getDisplayScale();
+        LLView* root = gViewerWindow->getRootView();
+        for (LLView* view = root->childFromPoint(ll_round(x / scale.mV[VX]), ll_round(y / scale.mV[VY]), true);
+             view && view != root; view = view->getParent())
+        {
+            const LLUICtrl* ctrl = dynamic_cast<LLUICtrl*>(view);
+            if (ctrl && ctrl->acceptsTextInput())
+            {
+                return Pressed::TEXT;
+            }
+            if (dynamic_cast<LLDragHandle*>(view))
+            {
+                if (title)
+                {
+                    *title = view;
+                }
+                return Pressed::TITLE;
+            }
+        }
+        return Pressed::OTHER;
     }
 
     // While the left grip holds the panel, the right stick moves it along the laser and
@@ -215,16 +266,19 @@ namespace
 
     const F32 SMOOTH_TURN_FASTEST = 240.f * DEG_TO_RAD; // the fastest SLVRSmoothTurnSpeed, radians per second
     const F32 STICK_ON = 0.6f;       // a thumbstick counts as pushed beyond this
-    const F32 WALK_ON = 0.4f, RUN_ON = 0.9f; // the left stick walks pushed past this, and runs pushed all the way
+    // The left stick walks pushed past WALK_ON, and runs held all the way for RUN_HOLD seconds:
+    // at 0.9 without a wait a slight push already ran.
+    const F32 WALK_ON = 0.4f, RUN_ON = 0.95f, RUN_HOLD = 0.3f;
     const F32 RECENTER_HOLD = 0.8f;  // seconds X is held to recentre
     const F32 BLINK_TIME = 0.2f;     // seconds the view takes to come back from black after a jump
     const F32 TICK_STRENGTH = 0.12f, TICK_TIME = 0.012f;   // vibration as a laser moves onto a key or a button
     const F32 PRESS_STRENGTH = 0.35f, PRESS_TIME = 0.025f; // and as one is pressed
     const F32 EYES_BELOW_TOP = 0.11f; // metres from the eyes to the top of the head: height = eye height + this
     // Teleport arc: thrown from the hand along the laser, falling like a ball, in steps.
-    const F32 ARC_SPEED = 10.f, ARC_GRAVITY = 9.8f; // m/s, m/s^2: some 12 metres on level ground
+    // Some 22 metres on level ground: many places send a short teleport to their landing point.
+    const F32 ARC_SPEED = 14.1f, ARC_GRAVITY = 9.8f; // m/s, m/s^2
     const F32 ARC_STEP = 0.05f;   // seconds of flight per step
-    const S32 ARC_STEPS = 50;
+    const S32 ARC_STEPS = 70;
     const F32 ARC_FLAT = 0.7f;    // a surface is stood on when its normal is this close to straight up
     const F32 ARC_RING = 0.35f;   // metres, the landing ring
     // Wrist menu: an image of 2 x 3 buttons over the other hand, while its face is turned to the eyes.
@@ -314,20 +368,41 @@ namespace
     // Comfort vignette, SLVRVignette 1 to 3 (low to high): the angle off the line of sight
     // where it starts to darken, and where it is black. As in Meta's comfort vignette, moving
     // and turning both close it in (but not a snap turn, which has no motion to feel), within
-    // VIGNETTE_IN seconds; it opens again within VIGNETTE_OUT once the view is still.
+    // VIGNETTE_IN seconds. It stays closed while the motion goes on, through the pauses
+    // between stick pushes and the frames in which the avatar's position does not move (it
+    // opened a little in each and read as blinking), and opens again within VIGNETTE_OUT
+    // once the view has been still for VIGNETTE_HOLD.
     const F32 VIGNETTE_CLEAR[3] = { 50.f, 38.f, 26.f }, VIGNETTE_BLACK[3] = { 70.f, 58.f, 45.f }; // degrees
-    const F32 VIGNETTE_IN = 0.25f, VIGNETTE_OUT = 0.5f;
+    const F32 VIGNETTE_IN = 0.25f, VIGNETTE_OUT = 0.5f, VIGNETTE_HOLD = 0.4f;
+    // Rising and sinking count for this much of their speed: flying up or down closed the
+    // vignette almost over the whole view.
+    const F32 VIGNETTE_VERTICAL = 0.35f;
     // In one frame: the view was sent somewhere (a teleport, a region crossing), not moved.
     const F32 VIGNETTE_JUMP = 1.5f;      // metres
     const F32 VIGNETTE_TURN_JUMP = 1.f;  // radians; snap turns are told apart by mSnapped
 
-    // How far the vignette closes in while the view moves at `speed` (m/s) and turns at
-    // `turn_rate` (rad/s): fully from walking pace, or from 60 degrees a second.
-    F32 vignetteTarget(F32 speed, F32 turn_rate)
+    // How far the vignette closes in while the view moves at `level_speed` and
+    // `vertical_speed` (m/s) and turns at `turn_rate` (rad/s): fully from walking pace, or
+    // from 60 degrees a second.
+    F32 vignetteTarget(F32 level_speed, F32 vertical_speed, F32 turn_rate)
     {
+        const F32 speed = sqrtf(level_speed * level_speed + powf(vertical_speed * VIGNETTE_VERTICAL, 2.f));
         const F32 moving = (speed - 0.5f) / 2.5f;
         const F32 turning = (fabsf(turn_rate) - 10.f * DEG_TO_RAD) / (50.f * DEG_TO_RAD);
         return llclamp(llmax(moving, turning), 0.f, 1.f);
+    }
+
+    // The strongest of `target` over the motion going on: it comes down only once it has been
+    // below it for VIGNETTE_HOLD seconds. `held` and `since` are kept between frames.
+    F32 holdPeak(F32 target, F32& held, F32& since, F32 dt)
+    {
+        since += dt;
+        if (target >= held || since > VIGNETTE_HOLD)
+        {
+            held = target;
+            since = 0.f;
+        }
+        return held;
     }
 
     // Change of heading from `from` to `to`, the short way round.
@@ -347,10 +422,17 @@ namespace
 
     void checkVignette()
     {
-        llassert_always(vignetteTarget(0.f, 0.f) == 0.f);
-        llassert_always(vignetteTarget(0.3f, 5.f * DEG_TO_RAD) == 0.f); // standing: an avatar's sway is no motion
-        llassert_always(vignetteTarget(3.2f, 0.f) == 1.f);              // walking
-        llassert_always(vignetteTarget(0.f, -120.f * DEG_TO_RAD) == 1.f); // smooth turning at full stick
+        llassert_always(vignetteTarget(0.f, 0.f, 0.f) == 0.f);
+        llassert_always(vignetteTarget(0.3f, 0.f, 5.f * DEG_TO_RAD) == 0.f); // standing: an avatar's sway is no motion
+        llassert_always(vignetteTarget(3.2f, 0.f, 0.f) == 1.f);              // walking
+        llassert_always(vignetteTarget(0.f, 0.f, -120.f * DEG_TO_RAD) == 1.f); // smooth turning at full stick
+        llassert_always(vignetteTarget(0.f, 4.f, 0.f) < 0.4f);               // rising, as flying up does
+        F32 held = 0.f, since = 0.f;
+        llassert_always(holdPeak(1.f, held, since, 0.03f) == 1.f);
+        llassert_always(holdPeak(0.f, held, since, 0.2f) == 1.f);  // a pause between pushes
+        llassert_always(holdPeak(0.f, held, since, 0.15f) == 1.f);
+        llassert_always(holdPeak(0.f, held, since, 0.1f) == 0.f);  // still for longer than VIGNETTE_HOLD
+        llassert_always(holdPeak(0.6f, held, since, 0.03f) == 0.6f);
         llassert_always(fabsf(headingChange(179.f * DEG_TO_RAD, -179.f * DEG_TO_RAD) - 2.f * DEG_TO_RAD) < 1e-4f);
         llassert_always(fabsf(headingChange(-179.f * DEG_TO_RAD, 179.f * DEG_TO_RAD) + 2.f * DEG_TO_RAD) < 1e-4f);
         llassert_always(SMOOTH_TURN_FASTEST * 0.1f < VIGNETTE_TURN_JUMP); // the fastest smooth turn at 10 fps is no jump
@@ -418,6 +500,20 @@ namespace
         facing(dir, q);
         rotate(q, face, out);
         llassert_always(fabsf(out[0] + dir[0]) + fabsf(out[1] + dir[1]) + fabsf(out[2] + dir[2]) < 1e-4f);
+
+        // Heading and pitch go there and back; none of either is straight ahead.
+        direction(0.7f, -0.4f, out);
+        llassert_always(fabsf(headingOf(out) - 0.7f) < 1e-4f && fabsf(pitchOf(out) + 0.4f) < 1e-4f);
+        direction(0.f, 0.f, out);
+        llassert_always(fabsf(out[0]) + fabsf(out[1]) + fabsf(out[2] + 1.f) < 1e-4f);
+
+        // The keyboard comes up ahead and below the eyes, its face turned up towards them.
+        const float eyes[3] = { 0.f, 0.f, 0.f };
+        float ahead[3], centre[3], keyboard[4];
+        direction(0.f, -KEYBOARD_BELOW, ahead);
+        placeAlong(eyes, ahead, 0.8f, 0.f, 0.f, centre, keyboard);
+        rotate(keyboard, face, out);
+        llassert_always(centre[1] < -0.4f && centre[2] < -0.5f && out[1] > 0.5f && out[2] > 0.5f);
     }
 }
 
@@ -447,7 +543,7 @@ void LLViewerVR::updateEnabled()
         mPanelWidth = llclamp(gSavedSettings.getF32("SLVRPanelWidth"), PANEL_NARROW, PANEL_WIDE);
         mPanelDistance = llclamp(gSavedSettings.getF32("SLVRPanelDistance"), PANEL_NEAR, PANEL_FAR);
         mKeyboardWidth = llclamp(gSavedSettings.getF32("SLVRKeyboardWidth"), KEYBOARD_NARROW, KEYBOARD_WIDE);
-        mKeyboardAhead = llclamp(gSavedSettings.getF32("SLVRKeyboardDistance"), PANEL_NEAR, PANEL_FAR);
+        mKeyboardAhead = llclamp(gSavedSettings.getF32("SLVRKeyboardReach"), PANEL_NEAR, PANEL_FAR);
         applyGraphics(true);
         gIdleCallbacks.addFunction(onIdle, this);
         // Instant messages; nearby chat comes through noteChat().
@@ -480,13 +576,13 @@ void LLViewerVR::shutdown()
     mBackend.shutdown();
     mLaserValid = mPanelHit = mWorldHit = mFirstPerson = mLeftLaserValid = mLeftPanelHit = false;
     mSteady.valid = mLeftSteady.valid = mMotionValid = false;
-    mVignette = mBlink = 0.f;
+    mVignette = mBlink = mVignetteHeld = 0.f;
     for (ControllerModel*& model : sControllerModels)
     {
         delete model; // its texture with it, while GL is still there
         model = nullptr;
     }
-    mKeyboardShown = mWristShown = mArcAiming = mArcValid = mOwnZoom = mPanelFollowing = false;
+    mKeyboardShown = mKeyboardWanted = mWristShown = mArcAiming = mArcValid = mOwnZoom = mPanelFollowing = mTitleDrag = false;
     mArc.clear();
     applyGraphics(false);
     mKeyboardHit[0] = mKeyboardHit[1] = LLVRKeyboard::Hit();
@@ -774,6 +870,22 @@ void LLViewerVR::updatePointer()
     {
         updateArc(pos, dir);
         mLaserValid = false;
+        mKeyboardHit[0] = LLVRKeyboard::Hit();
+        return;
+    }
+
+    if (mTitleDrag) // see startTitleDrag()
+    {
+        float eyes[3], point[3], look[3];
+        for (S32 i = 0; i < 3; ++i)
+        {
+            eyes[i] = (mEyes[0].pos[i] + mEyes[1].pos[i]) / 2.f;
+            point[i] = pos[i] + dir[i] * mTitleDragAlong - eyes[i];
+        }
+        const F32 pitch = llclamp(pitchOf(point) + mTitleDragPitch, -80.f * DEG_TO_RAD, 80.f * DEG_TO_RAD);
+        direction(headingOf(point) + mTitleDragHeading, pitch, look);
+        placeAlong(eyes, look, mTitleDragDistance, mTitleDragX, mTitleDragY, mPanelCentre, mPanelRot);
+        mLaserLength = mTitleDragAlong;
         mKeyboardHit[0] = LLVRKeyboard::Hit();
         return;
     }
@@ -1153,17 +1265,22 @@ void LLViewerVR::updateVignette(F32 yaw)
     F32 target = 0.f;
     if (mMotionValid && dt > 0.f)
     {
-        const F32 moved = (mBaseOrigin - mMotionOrigin).length();
+        const LLVector3 delta = mBaseOrigin - mMotionOrigin;
+        const F32 moved = delta.length();
         const F32 turned = headingChange(mMotionYaw, yaw);
         if (mFirstPerson != mMotionFirstPerson || moved > VIGNETTE_JUMP || fabsf(turned) > VIGNETTE_TURN_JUMP)
         {
             blink(); // a teleport, a region crossing, the zoom starting or ending: no motion, a jump
+            LL_INFOS("VR") << "Blink over a jump: " << moved << " m, " << turned << " rad, eyes view " << mMotionFirstPerson
+                           << " to " << mFirstPerson << LL_ENDL;
         }
         else
         {
-            target = vignetteTarget(moved / dt, mSnapped ? 0.f : turned / dt);
+            const F32 level = sqrtf(delta.mV[VX] * delta.mV[VX] + delta.mV[VY] * delta.mV[VY]);
+            target = vignetteTarget(level / dt, fabsf(delta.mV[VZ]) / dt, mSnapped ? 0.f : turned / dt);
         }
     }
+    target = holdPeak(target, mVignetteHeld, mVignetteHeldFor, dt);
     mSnapped = false;
     mBlink = llmax(0.f, mBlink - llmin(dt, 0.05f) / BLINK_TIME); // at least a few frames, however long the jump took
     mMotionValid = true;
@@ -1276,19 +1393,26 @@ void LLViewerVR::recenter()
 void LLViewerVR::followPanel()
 {
     static LLCachedControl<bool> follow(gSavedSettings, "SLVRPanelFollow", false);
-    if (!follow || !mPanelVisible || mGrabbing || mEye < 0)
+    if (!follow || !mPanelVisible || mGrabbing || mTitleDrag || mEye < 0)
     {
         mPanelFollowing = false;
         return;
     }
-    const float FORWARD[3] = { 0.f, 0.f, -1.f };
-    float eyes[3], look[3], centre[3], rot[4];
+    // With only the chat shown, the conversation window comes in front of the eyes, not the
+    // panel's middle, which left the window off to the side.
+    F32 dx = 0.f, dy = 0.f;
+    windowOffset(mChatOnly ? chatFloater() : nullptr, dx, dy);
+    const float FORWARD[3] = { 0.f, 0.f, -1.f }, RIGHT[3] = { 1.f, 0.f, 0.f }, UP[3] = { 0.f, 1.f, 0.f };
+    float eyes[3], look[3], centre[3], rot[4], right[3], up[3];
+    rotate(mPanelRot, RIGHT, right);
+    rotate(mPanelRot, UP, up);
     for (S32 i = 0; i < 3; ++i)
     {
         eyes[i] = (mEyes[0].pos[i] + mEyes[1].pos[i]) / 2.f;
     }
     rotate(mEyes[0].rot, FORWARD, look);
-    LLVector3 to_panel(mPanelCentre[0] - eyes[0], mPanelCentre[1] - eyes[1], mPanelCentre[2] - eyes[2]);
+    LLVector3 to_panel(mPanelCentre[0] + right[0] * dx + up[0] * dy - eyes[0], mPanelCentre[1] + right[1] * dx + up[1] * dy - eyes[1],
+                       mPanelCentre[2] + right[2] * dx + up[2] * dy - eyes[2]);
     to_panel.normalize();
     const F32 cosine = to_panel.mV[0] * look[0] + to_panel.mV[1] * look[1] + to_panel.mV[2] * look[2];
     if (cosine < cosf(PANEL_FOLLOW_AWAY))
@@ -1299,7 +1423,7 @@ void LLViewerVR::followPanel()
     {
         return;
     }
-    placeAhead(eyes, mEyes[0].rot, mPanelDistance, 0.f, 0.f, centre, rot);
+    placeAhead(eyes, mEyes[0].rot, mPanelDistance, dx, dy, centre, rot);
     const F32 share = lowPass(PANEL_FOLLOW_RATE, llmin((F32)gFrameIntervalSeconds, 0.1f));
     const F32 same_way = mPanelRot[0] * rot[0] + mPanelRot[1] * rot[1] + mPanelRot[2] * rot[2] + mPanelRot[3] * rot[3] < 0.f ? -1.f : 1.f;
     F32 length = 0.f;
@@ -1693,13 +1817,16 @@ void LLViewerVR::pressWrist()
 // SLVRVRGraphics: lighter graphics while in VR. Every eye is a frame of its own, and the frame
 // rate is what comfort rests on most. Set as unsaved values: what is saved stays the user's
 // own settings, even if the viewer goes down in VR, and they come back as VR is switched off.
-void LLViewerVR::applyGraphics(bool vr)
+// Called every frame in VR, so that switching the setting takes effect at once.
+void LLViewerVR::applyGraphics(bool in_vr)
 {
     struct Cap { const char* name; F32 most; };
     static const Cap CAPS[] = { { "RenderShadowDetail", 0.f }, { "RenderScreenSpaceReflections", 0.f },
                                 { "RenderDepthOfField", 0.f }, { "RenderMirrors", 0.f },
                                 { "RenderFarClip", 96.f }, { "RenderAvatarMaxNonImpostors", 8.f } };
-    if (vr == mGraphicsApplied || (vr && !gSavedSettings.getBOOL("SLVRVRGraphics")))
+    static LLCachedControl<bool> lighter(gSavedSettings, "SLVRVRGraphics", true);
+    const bool vr = in_vr && lighter;
+    if (vr == mGraphicsApplied)
     {
         return;
     }
@@ -1723,12 +1850,6 @@ void LLViewerVR::applyGraphics(bool vr)
         }
     }
     LL_INFOS("VR") << (vr ? "Lighter VR graphics on" : "Lighter VR graphics off, the user's own back") << LL_ENDL;
-}
-
-F32 LLViewerVR::worldTextScale() const
-{
-    static LLCachedControl<F32> scale(gSavedSettings, "SLVRWorldTextScale", 1.f);
-    return llclamp((F32)scale, 0.5f, 3.f);
 }
 
 bool LLViewerVR::measureHeight(F32& body_height)
@@ -2122,14 +2243,8 @@ void LLViewerVR::placePanel(const LLView* around)
     {
         return;
     }
-    F32 dx = 0.f, dy = 0.f; // metres from the panel's middle to the window's
-    if (around)
-    {
-        const LLVector2 scale = gViewerWindow->getDisplayScale();
-        const LLRect r = around->calcScreenRect(); // UI units
-        dx = (r.getCenterX() * scale.mV[VX] / window.getWidth() - 0.5f) * mPanelWidth;
-        dy = (r.getCenterY() * scale.mV[VY] / window.getHeight() - 0.5f) * mPanelWidth * window.getHeight() / window.getWidth();
-    }
+    F32 dx = 0.f, dy = 0.f;
+    windowOffset(around, dx, dy);
     float eyes[3];
     for (S32 i = 0; i < 3; ++i)
     {
@@ -2138,9 +2253,77 @@ void LLViewerVR::placePanel(const LLView* around)
     placeAhead(eyes, mEyes[0].rot, mPanelDistance, dx, dy, mPanelCentre, mPanelRot);
 }
 
+// Metres from the panel's middle to a window's (in the panel's plane, right and up); none
+// for no window.
+void LLViewerVR::windowOffset(const LLView* around, F32& dx, F32& dy) const
+{
+    const LLRect window = gViewerWindow->getWindowRectRaw();
+    dx = dy = 0.f;
+    if (around && window.getWidth() > 0 && window.getHeight() > 0)
+    {
+        const LLVector2 scale = gViewerWindow->getDisplayScale();
+        const LLRect r = around->calcScreenRect(); // UI units
+        dx = (r.getCenterX() * scale.mV[VX] / window.getWidth() - 0.5f) * mPanelWidth;
+        dy = (r.getCenterY() * scale.mV[VY] / window.getHeight() - 0.5f) * mPanelWidth * window.getHeight() / window.getWidth();
+    }
+}
+
+// The trigger pressed on the title bar of a window shown on its own (chat only, or a popped
+// window): instead of moving the window across the panel, where it went out of the image's
+// bottom and seemed to shrink, the panel goes round the eyes with the laser, the window
+// staying square on to them at its distance. See updatePointer().
+bool LLViewerVR::startTitleDrag(LLView* title)
+{
+    const LLView* window = title ? title->getParent() : nullptr;
+    if (!window || !mSteady.valid)
+    {
+        return false;
+    }
+    windowOffset(window, mTitleDragX, mTitleDragY);
+    const float RIGHT[3] = { 1.f, 0.f, 0.f }, UP[3] = { 0.f, 1.f, 0.f };
+    float right[3], up[3], middle[3], point[3];
+    rotate(mPanelRot, RIGHT, right);
+    rotate(mPanelRot, UP, up);
+    for (S32 i = 0; i < 3; ++i)
+    {
+        const F32 eyes = (mEyes[0].pos[i] + mEyes[1].pos[i]) / 2.f;
+        middle[i] = mPanelCentre[i] + right[i] * mTitleDragX + up[i] * mTitleDragY - eyes;
+        point[i] = mSteady.pos[i] + mSteady.dir[i] * mLaserLength - eyes;
+    }
+    mTitleDragHeading = headingChange(headingOf(point), headingOf(middle));
+    mTitleDragPitch = pitchOf(middle) - pitchOf(point);
+    mTitleDragDistance = llclamp(sqrtf(middle[0] * middle[0] + middle[1] * middle[1] + middle[2] * middle[2]), PANEL_NEAR, PANEL_FAR);
+    mTitleDragAlong = mLaserLength;
+    mTitleDrag = true;
+    return true;
+}
+
+// Where the line of sight meets the panel, window pixels (origin bottom left), whatever of
+// it is shown.
+bool LLViewerVR::gazePoint(S32& x, S32& y) const
+{
+    const LLRect window = gViewerWindow->getWindowRectRaw();
+    if (window.getWidth() <= 0 || window.getHeight() <= 0)
+    {
+        return false;
+    }
+    const float FORWARD[3] = { 0.f, 0.f, -1.f };
+    float eyes[3], look[3];
+    rotate(mEyes[0].rot, FORWARD, look);
+    for (S32 i = 0; i < 3; ++i)
+    {
+        eyes[i] = (mEyes[0].pos[i] + mEyes[1].pos[i]) / 2.f;
+    }
+    F32 along = 0.f;
+    const F32 height = mPanelWidth * window.getHeight() / window.getWidth(), radius = panelRadius();
+    return radius > 0.f ? hitCylinder(mPanelCentre, mPanelRot, mPanelWidth, height, radius, window.getWidth(), window.getHeight(), eyes, look, x, y, along)
+                        : hitQuad(mPanelCentre, mPanelRot, mPanelWidth, height, window.getWidth(), window.getHeight(), eyes, look, x, y, along);
+}
+
 void LLViewerVR::onIdle(void* self)
 {
     LLViewerVR* vr = static_cast<LLViewerVR*>(self);
+    vr->applyGraphics(vr->mBackend.isInitialized());
     vr->applyInput();
     if (vr->mShotSaving.valid() && vr->mShotSaving.wait_for(std::chrono::seconds(0)) == std::future_status::ready)
     {
@@ -2258,8 +2441,10 @@ void LLViewerVR::saveScreenshot(ShotLayer eye_image, ShotLayer panel, ShotLayer 
 // below and ahead of the head; after that it stays where it was put.
 void LLViewerVR::updateKeyboard()
 {
+    // Only once a text field was pressed (mKeyboardWanted): a press anywhere on a conversation
+    // window gives its text field the focus, and the keyboard came up with every one.
     LLUICtrl* focus = dynamic_cast<LLUICtrl*>(gFocusMgr.getKeyboardFocus());
-    const bool shown = mPanelVisible && focus && focus->acceptsTextInput();
+    const bool shown = mPanelVisible && mKeyboardWanted && focus && focus->acceptsTextInput();
     if (!shown)
     {
         if (mKeyboardShown)
@@ -2267,20 +2452,25 @@ void LLViewerVR::updateKeyboard()
             mKeyboard.reset();
         }
         mKeyboardShown = false;
+        mKeyboardWanted = mKeyboardWanted && mTriggerDown; // the field may take the focus as the press ends
         mDragHand = mRepeatHand = -1;
         return;
     }
     if (!mKeyboardShown)
     {
-        // Each time it comes up: ahead along the line of sight, square on to it, its top edge
-        // just under the point looked at (the text field just pressed).
-        float eyes[3];
+        // Each time it comes up: low in front, see KEYBOARD_BELOW. Facing straight down, the
+        // head's up axis gives the heading.
+        const float FORWARD[3] = { 0.f, 0.f, -1.f }, UP[3] = { 0.f, 1.f, 0.f };
+        float eyes[3], look[3], up[3], ahead[3];
+        rotate(mEyes[0].rot, FORWARD, look);
+        rotate(mEyes[0].rot, UP, up);
+        const bool level = look[0] * look[0] + look[2] * look[2] > 0.1f;
+        direction(headingOf(level ? look : up), -KEYBOARD_BELOW, ahead);
         for (S32 i = 0; i < 3; ++i)
         {
             eyes[i] = (mEyes[0].pos[i] + mEyes[1].pos[i]) / 2.f;
         }
-        const F32 half_height = mKeyboardWidth * LLVRKeyboard::HEIGHT / LLVRKeyboard::WIDTH / 2.f;
-        placeAhead(eyes, mEyes[0].rot, mKeyboardAhead, 0.f, half_height, mKeyboardCentre, mKeyboardRot);
+        placeAlong(eyes, ahead, mKeyboardAhead, 0.f, 0.f, mKeyboardCentre, mKeyboardRot);
     }
     mKeyboardShown = true;
     mKeyboard.update();
@@ -2361,7 +2551,7 @@ void LLViewerVR::releaseKeyboard(S32 hand)
                                   mKeyboardCentre[2] - (mEyes[0].pos[2] + mEyes[1].pos[2]) / 2.f);
         mKeyboardAhead = llclamp(from_eyes.length(), PANEL_NEAR, PANEL_FAR);
         gSavedSettings.setF32("SLVRKeyboardWidth", mKeyboardWidth);
-        gSavedSettings.setF32("SLVRKeyboardDistance", mKeyboardAhead);
+        gSavedSettings.setF32("SLVRKeyboardReach", mKeyboardAhead);
     }
     if (mRepeatHand == hand)
     {
@@ -2404,9 +2594,17 @@ void LLViewerVR::applyInput()
         }
         else if (!mChatOnly)
         {
+            // The panel stays where it is: the conversation window is seen where it just was.
+            // The script dialogs open on the panel stay with it (see updatePopped()).
             mChatOnly = true;
             showChat();
-            placePanel(chatFloater());
+            for (LLFloater* dialog : LLFloaterReg::getFloaterList("script_floater"))
+            {
+                if (dialog->isShown() && !dialog->getHost() && !isPopped(dialog))
+                {
+                    mPopped.push_back(dialog->getHandle());
+                }
+            }
         }
         else
         {
@@ -2496,12 +2694,25 @@ void LLViewerVR::applyInput()
     // Left stick walks and strafes, like the arrow keys, and pushed all the way runs. Walking
     // brings a zoomed camera back to the avatar.
     const bool walk = fabsf(input.move[1]) > WALK_ON, strafe = fabsf(input.move[0]) > WALK_ON;
-    const bool run = (walk || strafe) && sqrtf(input.move[0] * input.move[0] + input.move[1] * input.move[1]) > RUN_ON
-                     && !gAgent.getFlying();
+    const bool all_the_way = (walk || strafe) && sqrtf(input.move[0] * input.move[0] + input.move[1] * input.move[1]) > RUN_ON
+                             && !gAgent.getFlying();
+    if (!all_the_way)
+    {
+        mRunTimer.stop();
+    }
+    else if (!mRunTimer.getStarted())
+    {
+        mRunTimer.start();
+    }
+    const bool run = all_the_way && mRunTimer.getElapsedTimeF32() > RUN_HOLD;
     if (run != mRunning)
     {
         mRunning = run;
         run ? gAgent.setTempRun() : gAgent.clearTempRun();
+        if (run)
+        {
+            buzz(1, PRESS_STRENGTH, PRESS_TIME); // felt in the walking hand: now running
+        }
     }
     static LLCachedControl<S32> walk_direction(gSavedSettings, "SLVRWalkDirection", 0);
     if ((walk || strafe) && mFirstPerson && isAgentAvatarValid() && !gAgentAvatarp->isSitting())
@@ -2681,6 +2892,26 @@ void LLViewerVR::applyInput()
             {
                 buzz(0, PRESS_STRENGTH, PRESS_TIME);
             }
+            // A press beside an open menu closes it, as a click beside it does on the screen,
+            // and does nothing else: the menu holder never sees presses into the world.
+            mTriggerClosedMenu = !mTriggerOnWrist && !on_keyboard && !on_panel && gMenuHolder->hasVisibleMenu();
+            if (mTriggerClosedMenu)
+            {
+                gMenuHolder->hideMenus();
+            }
+            if (on_panel)
+            {
+                LLView* title = nullptr;
+                const Pressed pressed = pressedAt(mPointerX, mPointerY, &title);
+                if (pressed != Pressed::TITLE) // dragging a window leaves the keyboard as it is
+                {
+                    mKeyboardWanted = pressed == Pressed::TEXT;
+                }
+                if (pressed == Pressed::TITLE && (mChatOnly || !mPanelVisible))
+                {
+                    startTitleDrag(title);
+                }
+            }
         }
         if (!mTriggerOnKeyboard && !mTriggerOnWrist)
         {
@@ -2696,6 +2927,14 @@ void LLViewerVR::applyInput()
         else if (mTriggerOnKeyboard)
         {
             input.trigger ? pressKeyboard(0) : releaseKeyboard(0);
+        }
+        else if (mTriggerClosedMenu)
+        {
+            // nothing more, see the press above
+        }
+        else if (mTitleDrag)
+        {
+            mTitleDrag = input.trigger; // the release ends it
         }
         else if (!mTriggerOnPanel)
         {
@@ -2732,6 +2971,7 @@ void LLViewerVR::applyInput()
             mGripOnKeyboard = on_keyboard; // nothing to click there
             mGripOnPanel = on_panel;
             mMenuOnly = !mPanelVisible; // the context menu opens on the panel, alone if it was hidden
+            mMenuPlaced = false;
             if (on_panel)
             {
                 buzz(0, PRESS_STRENGTH, PRESS_TIME);
@@ -2748,8 +2988,23 @@ void LLViewerVR::applyInput()
         }
         else if (LLTool* tool = mGripOnKeyboard ? nullptr : LLToolMgr::getInstance()->getCurrentTool())
         {
-            input.grip ? tool->handleRightMouseDown(mouse_x, mouse_y, mask) : tool->handleRightMouseUp(mouse_x, mouse_y, mask);
+            // The pick follows the laser whatever the point; the point is where the menu
+            // opens: where the eyes look on the panel, or its middle, not where the laser
+            // last left the panel, out of sight.
+            S32 x = gViewerWindow->getWindowWidthRaw() / 2, y = gViewerWindow->getWindowHeightRaw() / 2;
+            gazePoint(x, y);
+            const LLVector2 scale = gViewerWindow->getDisplayScale();
+            x = ll_round(x / scale.mV[VX]);
+            y = ll_round(y / scale.mV[VY]);
+            input.grip ? tool->handleRightMouseDown(x, y, mask) : tool->handleRightMouseUp(x, y, mask);
         }
+    }
+    // The menu the right grip opened on the hidden panel: the panel comes to where the eyes
+    // look, with the menu in the middle of the view. It may open a moment after the press.
+    if (mMenuOnly && !mMenuPlaced && !mPanelVisible && gMenuHolder->hasVisibleMenu())
+    {
+        mMenuPlaced = true;
+        placePanel(gMenuHolder->getVisibleMenu());
     }
 
     // A light tick as a laser moves onto a key, a wrist menu item, or a button or menu item

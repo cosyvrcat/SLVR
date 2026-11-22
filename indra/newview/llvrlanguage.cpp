@@ -144,7 +144,7 @@ namespace
             {
                 getChild<LLTextBox>(name)->setText(LLVRLanguage::text(name));
             }
-            for (const char* name : { "turn_speed", "body_height", "text_scale" })
+            for (const char* name : { "turn_speed", "body_height" })
             {
                 getChild<LLSliderCtrl>(name)->setLabel(LLVRLanguage::text(name));
             }

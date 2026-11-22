@@ -57,7 +57,6 @@
       <key>show_controllers</key><string>Show the controllers (off: lasers only)</string>
       <key>curved_panel</key><string>Curved panel</string>
       <key>panel_follow</key><string>Panel follows my view</string>
-      <key>text_scale</key><string>Name tag size:</string>
       <key>performance_preset</key><string>Lighter graphics in VR (smoother)</string>
       <key>wrist_panel</key><string>Panel</string>
       <key>wrist_chat</key><string>Chat</string>
@@ -126,7 +125,6 @@
       <key>show_controllers</key><string>Kontrolcüleri göster (kapalıyken yalnızca lazer)</string>
       <key>curved_panel</key><string>Kavisli panel</string>
       <key>panel_follow</key><string>Panel bakışımı takip etsin</string>
-      <key>text_scale</key><string>İsim etiketi boyutu:</string>
       <key>performance_preset</key><string>VR'da hafif grafik (daha akıcı)</string>
       <key>wrist_panel</key><string>Panel</string>
       <key>wrist_chat</key><string>Sohbet</string>
@@ -195,7 +193,6 @@
       <key>show_controllers</key><string>Kontrollerləri göstər (söndürülü: yalnız lazer)</string>
       <key>curved_panel</key><string>Əyri panel</string>
       <key>panel_follow</key><string>Panel baxışımı izləsin</string>
-      <key>text_scale</key><string>Ad etiketinin ölçüsü:</string>
       <key>performance_preset</key><string>VR-da yüngül qrafika (daha axıcı)</string>
       <key>wrist_panel</key><string>Panel</string>
       <key>wrist_chat</key><string>Söhbət</string>
@@ -264,7 +261,6 @@
       <key>show_controllers</key><string>Vis controllerne (fra: kun laser)</string>
       <key>curved_panel</key><string>Buet panel</string>
       <key>panel_follow</key><string>Panelet følger mit blik</string>
-      <key>text_scale</key><string>Størrelse på navneskilte:</string>
       <key>performance_preset</key><string>Lettere grafik i VR (mere flydende)</string>
       <key>wrist_panel</key><string>Panel</string>
       <key>wrist_chat</key><string>Chat</string>
@@ -333,7 +329,6 @@
       <key>show_controllers</key><string>Controller anzeigen (aus: nur Laser)</string>
       <key>curved_panel</key><string>Gebogenes Panel</string>
       <key>panel_follow</key><string>Panel folgt meinem Blick</string>
-      <key>text_scale</key><string>Größe der Namensschilder:</string>
       <key>performance_preset</key><string>Leichtere Grafik in VR (flüssiger)</string>
       <key>wrist_panel</key><string>Panel</string>
       <key>wrist_chat</key><string>Chat</string>
@@ -402,7 +397,6 @@
       <key>show_controllers</key><string>Mostrar los mandos (desactivado: solo láser)</string>
       <key>curved_panel</key><string>Panel curvo</string>
       <key>panel_follow</key><string>El panel sigue mi mirada</string>
-      <key>text_scale</key><string>Tamaño de las etiquetas de nombre:</string>
       <key>performance_preset</key><string>Gráficos más ligeros en RV (más fluido)</string>
       <key>wrist_panel</key><string>Panel</string>
       <key>wrist_chat</key><string>Chat</string>
@@ -471,7 +465,6 @@
       <key>show_controllers</key><string>Afficher les manettes (désactivé : laser seul)</string>
       <key>curved_panel</key><string>Panneau incurvé</string>
       <key>panel_follow</key><string>Le panneau suit mon regard</string>
-      <key>text_scale</key><string>Taille des étiquettes de nom :</string>
       <key>performance_preset</key><string>Graphismes allégés en VR (plus fluide)</string>
       <key>wrist_panel</key><string>Panneau</string>
       <key>wrist_chat</key><string>Chat</string>
@@ -540,7 +533,6 @@
       <key>show_controllers</key><string>Mostra i controller (disattivato: solo laser)</string>
       <key>curved_panel</key><string>Pannello curvo</string>
       <key>panel_follow</key><string>Il pannello segue il mio sguardo</string>
-      <key>text_scale</key><string>Dimensione delle etichette dei nomi:</string>
       <key>performance_preset</key><string>Grafica più leggera in VR (più fluida)</string>
       <key>wrist_panel</key><string>Pannello</string>
       <key>wrist_chat</key><string>Chat</string>
@@ -609,7 +601,6 @@
       <key>show_controllers</key><string>Pokaż kontrolery (wył.: tylko laser)</string>
       <key>curved_panel</key><string>Zakrzywiony panel</string>
       <key>panel_follow</key><string>Panel podąża za wzrokiem</string>
-      <key>text_scale</key><string>Rozmiar etykiet z imionami:</string>
       <key>performance_preset</key><string>Lżejsza grafika w VR (płynniej)</string>
       <key>wrist_panel</key><string>Panel</string>
       <key>wrist_chat</key><string>Czat</string>
@@ -678,7 +669,6 @@
       <key>show_controllers</key><string>Mostrar os controles (desligado: só o laser)</string>
       <key>curved_panel</key><string>Painel curvo</string>
       <key>panel_follow</key><string>O painel segue meu olhar</string>
-      <key>text_scale</key><string>Tamanho das etiquetas de nome:</string>
       <key>performance_preset</key><string>Gráficos mais leves em RV (mais fluido)</string>
       <key>wrist_panel</key><string>Painel</string>
       <key>wrist_chat</key><string>Chat</string>
@@ -747,7 +737,6 @@
       <key>show_controllers</key><string>Показывать контроллеры (выкл.: только лазер)</string>
       <key>curved_panel</key><string>Изогнутая панель</string>
       <key>panel_follow</key><string>Панель следует за взглядом</string>
-      <key>text_scale</key><string>Размер табличек с именами:</string>
       <key>performance_preset</key><string>Облегчённая графика в VR (плавнее)</string>
       <key>wrist_panel</key><string>Панель</string>
       <key>wrist_chat</key><string>Чат</string>
@@ -810,7 +799,6 @@
       <key>show_controllers</key><string>コントローラーを表示（オフ：レーザーのみ）</string>
       <key>curved_panel</key><string>曲面パネル</string>
       <key>panel_follow</key><string>パネルが視線についてくる</string>
-      <key>text_scale</key><string>名前タグの大きさ:</string>
       <key>performance_preset</key><string>VRでは軽いグラフィック（より滑らか）</string>
       <key>wrist_panel</key><string>パネル</string>
       <key>wrist_chat</key><string>チャット</string>
@@ -873,7 +861,6 @@
       <key>show_controllers</key><string>显示手柄（关闭：仅激光）</string>
       <key>curved_panel</key><string>曲面面板</string>
       <key>panel_follow</key><string>面板跟随视线</string>
-      <key>text_scale</key><string>名字标签大小:</string>
       <key>performance_preset</key><string>VR 中使用较轻的画质（更流畅）</string>
       <key>wrist_panel</key><string>面板</string>
       <key>wrist_chat</key><string>聊天</string>

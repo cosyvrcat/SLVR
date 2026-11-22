@@ -3,7 +3,7 @@
 <floater
  legacy_header_height="18"
  can_resize="false"
- height="398"
+ height="368"
  layout="topleft"
  name="slvr_settings"
  single_instance="true"
@@ -139,21 +139,6 @@
      name="panel_follow"
      top="304"
      width="403" />
-    <slider
-     control_name="SLVRWorldTextScale"
-     decimal_digits="1"
-     follows="left|top"
-     height="16"
-     increment="0.1"
-     label="Name tag size:"
-     label_width="170"
-     layout="topleft"
-     left="12"
-     max_val="3"
-     min_val="0.5"
-     name="text_scale"
-     top="334"
-     width="401" />
     <check_box
      control_name="SLVRVRGraphics"
      follows="left|top"
@@ -162,7 +147,7 @@
      layout="topleft"
      left="12"
      name="performance_preset"
-     top="364"
+     top="334"
      width="403" />
     <check_box
      control_name="SLVRSmoothTurn"

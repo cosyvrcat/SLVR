@@ -18215,17 +18215,6 @@ Change of this parameter will affect the layout of buttons in notification toast
       <key>Value</key>
       <integer>0</integer>
     </map>
-    <key>SLVRWorldTextScale</key>
-    <map>
-      <key>Comment</key>
-      <string>SLVR: size of name tags and floating text in the headset</string>
-      <key>Persist</key>
-      <integer>1</integer>
-      <key>Type</key>
-      <string>F32</string>
-      <key>Value</key>
-      <real>1</real>
-    </map>
     <key>SLVRPanelWidth</key>
     <map>
       <key>Comment</key>
@@ -18259,16 +18248,16 @@ Change of this parameter will affect the layout of buttons in notification toast
       <key>Value</key>
       <real>0.55</real>
     </map>
-    <key>SLVRKeyboardDistance</key>
+    <key>SLVRKeyboardReach</key>
     <map>
       <key>Comment</key>
-      <string>SLVR: metres from the eyes the on-screen keyboard was last placed</string>
+      <string>SLVR: metres from the eyes the on-screen keyboard was last placed (it comes up low in front, at the waist)</string>
       <key>Persist</key>
       <integer>1</integer>
       <key>Type</key>
       <string>F32</string>
       <key>Value</key>
-      <real>0.5</real>
+      <real>0.8</real>
     </map>
     <key>SLVRWordSuggestions</key>
     <map>
