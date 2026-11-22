@@ -93,6 +93,23 @@ namespace
         out[3] = cy * cp;
     }
 
+    // Puts a quad `distance` metres along the line of sight from the eyes (tracking space),
+    // square on to it, with the point `dx`, `dy` metres from its middle (in its own plane,
+    // right and up) on that line.
+    void placeAhead(const float eyes[3], const float eye_rot[4], F32 distance, F32 dx, F32 dy, float centre[3], float rot[4])
+    {
+        const float FORWARD[3] = { 0.f, 0.f, -1.f }, RIGHT[3] = { 1.f, 0.f, 0.f }, UP[3] = { 0.f, 1.f, 0.f };
+        float look[3], right[3], up[3];
+        rotate(eye_rot, FORWARD, look);
+        facing(look, rot);
+        rotate(rot, RIGHT, right);
+        rotate(rot, UP, up);
+        for (S32 i = 0; i < 3; ++i)
+        {
+            centre[i] = eyes[i] + look[i] * distance - right[i] * dx - up[i] * dy;
+        }
+    }
+
     // While the left grip holds the panel, the right stick moves it along the laser and
     // resizes it, within these limits (metres).
     // shortcut: the panel's place and size are forgotten when the viewer closes; make them
@@ -101,10 +118,10 @@ namespace
     const F32 PANEL_NARROW = 0.4f, PANEL_WIDE = 4.f;
     const F32 PANEL_RATE = 1.5f; // e-foldings per second at full stick
 
-    // The on-screen keyboard's quad: its width in metres, and where it first appears relative
-    // to the head (metres ahead and below), tilted to face it.
+    // The on-screen keyboard's quad: its width in metres, and how far ahead of the eyes it
+    // appears (see updateKeyboard()).
     const F32 KEYBOARD_WIDTH = 0.55f, KEYBOARD_NARROW = 0.25f, KEYBOARD_WIDE = 1.5f;
-    const F32 KEYBOARD_AHEAD = 0.5f, KEYBOARD_BELOW = 0.3f;
+    const F32 KEYBOARD_AHEAD = 0.5f;
     const F32 KEY_REPEAT_DELAY = 0.5f, KEY_REPEAT_INTERVAL = 0.07f; // seconds, for backspace held down
 
     // What "chat only" keeps of the panel: Firestorm's conversation windows, docked or torn off.
@@ -179,6 +196,7 @@ void LLViewerVR::updateEnabled()
         LL_INFOS("VR") << "VR enabled, starting OpenXR" << LL_ENDL;
         checkConventions();
         checkSteady();
+        checkPlacement();
         LLVRKeyboard::selfCheck();
         std::string error;
         if (!mBackend.init(error))
@@ -219,7 +237,8 @@ void LLViewerVR::shutdown()
     mBackend.shutdown();
     mLaserValid = mPanelHit = mWorldHit = mFirstPerson = mLeftLaserValid = mLeftPanelHit = false;
     mSteady.valid = mLeftSteady.valid = false;
-    mKeyboardShown = mKeyboardPlaced = false;
+    mKeyboardShown = false;
+    mKeyboardWidth = KEYBOARD_WIDTH;
     mKeyboardHit[0] = mKeyboardHit[1] = LLVRKeyboard::Hit();
     mDragHand = mRepeatHand = -1;
     mIMConnection.disconnect();
@@ -463,6 +482,10 @@ void LLViewerVR::updatePointer()
             mPanelCentre[i] = pos[i] + dir[i] * mGrabDistance;
         }
         facing(dir, mPanelRot);
+        const LLVector3 from_eyes(mPanelCentre[0] - (mEyes[0].pos[0] + mEyes[1].pos[0]) / 2.f,
+                                  mPanelCentre[1] - (mEyes[0].pos[1] + mEyes[1].pos[1]) / 2.f,
+                                  mPanelCentre[2] - (mEyes[0].pos[2] + mEyes[1].pos[2]) / 2.f);
+        mPanelDistance = llclamp(from_eyes.length(), PANEL_NEAR, PANEL_FAR); // placePanel() keeps it
         mLaserLength = mGrabDistance;
         mKeyboardHit[0] = LLVRKeyboard::Hit();
         return;
@@ -619,6 +642,28 @@ bool LLViewerVR::hitQuad(const float centre[3], const float rot[4], F32 width, F
     return true;
 }
 
+// Self-check of placeAhead() as placePanel() uses it: looking up and to the left, the line
+// of sight meets the placed panel square on, in the middle of the window it was placed for.
+void LLViewerVR::checkPlacement()
+{
+    const F32 yaw = 0.6f, pitch = 0.3f; // radians
+    const float eye_rot[4] = { cosf(yaw / 2.f) * sinf(pitch / 2.f), sinf(yaw / 2.f) * cosf(pitch / 2.f),
+                               -sinf(yaw / 2.f) * sinf(pitch / 2.f), cosf(yaw / 2.f) * cosf(pitch / 2.f) };
+    const float eyes[3] = { 0.1f, 1.6f, 0.2f }, FORWARD[3] = { 0.f, 0.f, -1.f }, FACE[3] = { 0.f, 0.f, 1.f };
+    const F32 width = 1.8f, height = 0.9f;
+    const S32 image_width = 1000, image_height = 500, window_x = 820, window_y = 340; // the window's middle, pixels
+    float centre[3], rot[4], look[3], face[3];
+    placeAhead(eyes, eye_rot, 1.2f, ((F32)window_x / image_width - 0.5f) * width, ((F32)window_y / image_height - 0.5f) * height,
+               centre, rot);
+    rotate(eye_rot, FORWARD, look);
+    rotate(rot, FACE, face);
+    S32 x = 0, y = 0;
+    F32 along = 0.f;
+    llassert_always(hitQuad(centre, rot, width, height, image_width, image_height, eyes, look, x, y, along));
+    llassert_always(abs(x - window_x) <= 1 && abs(y - window_y) <= 1 && fabsf(along - 1.2f) < 1e-3f);
+    llassert_always(fabsf(face[0] + look[0]) + fabsf(face[1] + look[1]) + fabsf(face[2] + look[2]) < 1e-4f);
+}
+
 // Steadies a hand's pointing pose against tremor, which made the laser land on neighbouring
 // keys: an adaptive low-pass (the 1-euro filter) that follows slowly while the hand is
 // nearly still and at once when it swings.
@@ -740,7 +785,9 @@ void LLViewerVR::drawPanel(ShotLayer* shot)
     gViewerWindow->setup3DRender();
     if (mPanelVisible && !mChatOnly) // the chat alone means the chat alone
     {
+        gGLCoverageAlpha = true; // the HUD's translucent faces write their coverage, see LLDrawPoolAlpha::forwardRender()
         render_hud_attachments();
+        gGLCoverageAlpha = false;
     }
     glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &after);
     if (after != target)
@@ -756,10 +803,10 @@ void LLViewerVR::drawPanel(ShotLayer* shot)
     LLGLSUIDefault gls_ui;
     gViewerWindow->setup2DRender();
     {
-        // The HUD shaders do not write coverage to alpha. Make every pixel they drew opaque:
-        // those are the ones nearer than the cleared depth.
-        // shortcut: see-through HUD faces (they write no depth) keep whatever alpha their
-        // shader wrote; fix when a HUD that relies on them is unreadable.
+        // The opaque HUD shaders do not write coverage to alpha. Make every pixel they drew
+        // opaque: those are the ones nearer than the cleared depth. The translucent faces
+        // write no depth here, only their coverage; marked opaque, a HUD's soft shadow
+        // turned solid black (v0.5.3).
         LLGLDepthTest depth(GL_TRUE, GL_FALSE, GL_GREATER);
         glDepthRange(1.0, 1.0);
         gGL.setColorMask(false, true);
@@ -915,6 +962,7 @@ void LLViewerVR::updatePopped()
             if (asked && opened && !isPopped(floater) && !(mChatOnly && isChatFloater(floater)))
             {
                 mPopped.push_back(floater->getHandle());
+                placePanel(floater); // where the user looks, not at the window's corner of the panel
             }
         }
     }
@@ -1073,6 +1121,32 @@ void LLViewerVR::showChat()
     LLFloaterReg::showInstance("fs_im_container");
 }
 
+// Puts the panel square on to the line of sight, at its distance from the eyes, with the
+// middle of `around` (a window; the whole panel when null) where the eyes look: text reads
+// best seen straight on.
+void LLViewerVR::placePanel(const LLView* around)
+{
+    const LLRect window = gViewerWindow->getWindowRectRaw();
+    if (window.getWidth() <= 0 || window.getHeight() <= 0)
+    {
+        return;
+    }
+    F32 dx = 0.f, dy = 0.f; // metres from the panel's middle to the window's
+    if (around)
+    {
+        const LLVector2 scale = gViewerWindow->getDisplayScale();
+        const LLRect r = around->calcScreenRect(); // UI units
+        dx = (r.getCenterX() * scale.mV[VX] / window.getWidth() - 0.5f) * mPanelWidth;
+        dy = (r.getCenterY() * scale.mV[VY] / window.getHeight() - 0.5f) * mPanelWidth * window.getHeight() / window.getWidth();
+    }
+    float eyes[3];
+    for (S32 i = 0; i < 3; ++i)
+    {
+        eyes[i] = (mEyes[0].pos[i] + mEyes[1].pos[i]) / 2.f;
+    }
+    placeAhead(eyes, mEyes[0].rot, mPanelDistance, dx, dy, mPanelCentre, mPanelRot);
+}
+
 void LLViewerVR::onIdle(void* self)
 {
     LLViewerVR* vr = static_cast<LLViewerVR*>(self);
@@ -1203,34 +1277,17 @@ void LLViewerVR::updateKeyboard()
         mDragHand = mRepeatHand = -1;
         return;
     }
-    if (!mKeyboardPlaced)
+    if (!mKeyboardShown)
     {
-        mKeyboardPlaced = true;
-        const float FORWARD[3] = { 0.f, 0.f, -1.f };
-        float look[3], head[3], dir[3];
-        rotate(mEyes[0].rot, FORWARD, look);
-        F32 level = sqrtf(look[0] * look[0] + look[2] * look[2]);
-        if (level < 0.1f) // looking straight up or down: put it ahead of the seat instead
-        {
-            look[0] = 0.f;
-            look[2] = -1.f;
-            level = 1.f;
-        }
+        // Each time it comes up: ahead along the line of sight, square on to it, its top edge
+        // just under the point looked at (the text field just pressed).
+        float eyes[3];
         for (S32 i = 0; i < 3; ++i)
         {
-            head[i] = (mEyes[0].pos[i] + mEyes[1].pos[i]) / 2.f;
+            eyes[i] = (mEyes[0].pos[i] + mEyes[1].pos[i]) / 2.f;
         }
-        mKeyboardWidth = KEYBOARD_WIDTH;
-        mKeyboardCentre[0] = head[0] + look[0] / level * KEYBOARD_AHEAD;
-        mKeyboardCentre[1] = head[1] - KEYBOARD_BELOW;
-        mKeyboardCentre[2] = head[2] + look[2] / level * KEYBOARD_AHEAD;
-        const LLVector3 to_keyboard(mKeyboardCentre[0] - head[0], mKeyboardCentre[1] - head[1], mKeyboardCentre[2] - head[2]);
-        const F32 distance = to_keyboard.length();
-        for (S32 i = 0; i < 3; ++i)
-        {
-            dir[i] = to_keyboard.mV[i] / distance;
-        }
-        facing(dir, mKeyboardRot);
+        const F32 half_height = mKeyboardWidth * LLVRKeyboard::HEIGHT / LLVRKeyboard::WIDTH / 2.f;
+        placeAhead(eyes, mEyes[0].rot, KEYBOARD_AHEAD, 0.f, half_height, mKeyboardCentre, mKeyboardRot);
     }
     mKeyboardShown = true;
     mKeyboard.update();
@@ -1342,11 +1399,21 @@ void LLViewerVR::applyInput()
         if (!mPanelVisible)
         {
             mPanelVisible = true;
+            placePanel(nullptr);
         }
         else if (!mChatOnly)
         {
             mChatOnly = true;
             showChat();
+            LLFloater* chat = nullptr;
+            for (const char* name : CHAT_FLOATERS)
+            {
+                for (LLFloater* floater : LLFloaterReg::getFloaterList(name))
+                {
+                    chat = !chat && floater->isShown() && !floater->getHost() ? floater : chat;
+                }
+            }
+            placePanel(chat);
         }
         else
         {

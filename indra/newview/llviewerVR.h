@@ -27,6 +27,7 @@
 
 class LLChat;
 class LLFloater;
+class LLView;
 
 class LLViewerVR
 {
@@ -86,6 +87,7 @@ private:
     void pressKeyboard(S32 hand);
     void releaseKeyboard(S32 hand);
     void showChat();
+    void placePanel(const LLView* around);
     void noteMessage(const LLUUID& from);
     void drawLaser(const LLVector3& start, const LLVector3& dir, F32 length);
     // A screenshot's quad layers: their image and where they were.
@@ -140,6 +142,7 @@ private:
     SteadyPose mSteady, mLeftSteady;
     static void steady(SteadyPose& s, const float pos[3], const float rot[4], F32 dt);
     static void checkSteady();
+    static void checkPlacement();
     // Left laser: only while the on-screen keyboard is shown, so both hands can type.
     bool mLeftLaserValid = false, mLeftPanelHit = false;
     LLVector3 mLeftLaserStart, mLeftLaserDir;
@@ -157,9 +160,10 @@ private:
     bool mUpHeld = false, mFlyTried = false; // right stick pushed up, and flying already asked for
     LLFrameTimer mUpTimer;
 
-    // The UI panel: a rectangle in tracking space, straight ahead of where the user sat when
-    // VR started until it is moved (hold the left grip: it follows the laser).
+    // The UI panel: a rectangle in tracking space, put square on to the line of sight as it
+    // shows (see placePanel()) and moved by hand (hold the left grip: it follows the laser).
     float mPanelCentre[3] = { 0.f, -0.1f, -1.2f };
+    F32 mPanelDistance = 1.2f;                   // metres from the eyes
     float mPanelRot[4] = { 0.f, 0.f, 0.f, 1.f }; // quaternion x, y, z, w; identity faces +Z
     F32 mPanelWidth = 1.8f;                      // metres; the height follows the window's aspect ratio
     bool mGrabbing = false;
@@ -170,7 +174,7 @@ private:
     // On-screen keyboard: a quad of its own in tracking space while a text field has the
     // keyboard focus. Hands are 0 right, 1 left.
     LLVRKeyboard mKeyboard;
-    bool mKeyboardShown = false, mKeyboardPlaced = false;
+    bool mKeyboardShown = false;
     float mKeyboardCentre[3] = { 0.f, -0.3f, -0.5f };
     float mKeyboardRot[4] = { 0.f, 0.f, 0.f, 1.f };
     F32 mKeyboardWidth = 0.55f;

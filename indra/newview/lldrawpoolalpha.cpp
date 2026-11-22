@@ -138,6 +138,7 @@ static void prepare_alpha_shader(LLGLSLShader* shader, bool deferredEnvironment,
 }
 
 extern bool gCubeSnapshot;
+extern bool gGLCoverageAlpha; // SLVR, llrender.cpp
 
 void LLDrawPoolAlpha::renderPostDeferred(S32 pass)
 {
@@ -238,19 +239,24 @@ void LLDrawPoolAlpha::forwardRender(bool rigged)
     //enable writing to alpha for emissive effects
     gGL.setColorMask(true, true);
 
-    bool write_depth = rigged ||
+    // <SLVR> HUDs drawn into the see-through VR panel (gGLCoverageAlpha, llviewerVR.cpp): the
+    // alpha channel must take each face's coverage, and no depth, which the panel turns into
+    // full opacity. Otherwise a HUD's translucent shadows and glass came out solid black.
+    const bool vr_panel_hud = LLPipeline::sRenderingHUDs && gGLCoverageAlpha;
+    bool write_depth = !vr_panel_hud && (rigged ||
         LLDrawPoolWater::sSkipScreenCopy
         // we want depth written so that rendered alpha will
         // contribute to the alpha mask used for impostors
         || LLPipeline::sImpostorRenderAlphaDepthPass
-        || getType() == LLDrawPoolAlpha::POOL_ALPHA_PRE_WATER; // needed for accurate water fog
+        || getType() == LLDrawPoolAlpha::POOL_ALPHA_PRE_WATER); // needed for accurate water fog
+    // </SLVR>
 
 
     LLGLDepthTest depth(GL_TRUE, write_depth ? GL_TRUE : GL_FALSE);
 
     mColorSFactor = LLRender::BF_SOURCE_ALPHA;           // } regular alpha blend
     mColorDFactor = LLRender::BF_ONE_MINUS_SOURCE_ALPHA; // }
-    mAlphaSFactor = LLRender::BF_ZERO;                         // } glow suppression
+    mAlphaSFactor = vr_panel_hud ? LLRender::BF_ONE : LLRender::BF_ZERO; // } glow suppression (SLVR: coverage on the VR panel)
     mAlphaDFactor = LLRender::BF_ONE_MINUS_SOURCE_ALPHA;       // }
     gGL.blendFunc(mColorSFactor, mColorDFactor, mAlphaSFactor, mAlphaDFactor);
 
