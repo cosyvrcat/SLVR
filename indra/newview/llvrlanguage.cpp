@@ -19,6 +19,7 @@
 #include "llmenugl.h"
 #include "llsdserialize.h"
 #include "llsdutil.h"
+#include "llsliderctrl.h"
 #include "lltextbox.h"
 #include "llui.h"
 #include "llviewercontrol.h"
@@ -85,7 +86,12 @@ namespace
         return *find("en"); // load() makes sure it is there
     }
 
-    // The SLVR settings: SLVR's language, the keyboard layout, word suggestions.
+    // The laser colours the settings offer, by the names SLVRLaserColor stores; their texts
+    // have the keys "laser_" + name.
+    const char* const LASER_COLOURS[] = { "red", "orange", "yellow", "green", "blue", "purple", "white" };
+
+    // The SLVR settings: SLVR's language, the keyboard layout, word suggestions, turning, the
+    // comfort vignette and the lasers.
     class LLFloaterSLVRSettings : public LLFloater
     {
     public:
@@ -97,6 +103,10 @@ namespace
                                                                 { gSavedSettings.setString("SLVRLanguage", ctrl->getValue().asString()); });
             getChild<LLComboBox>("keyboard_layout")->setCommitCallback([](LLUICtrl* ctrl, const LLSD&)
                                                                        { gSavedSettings.setString("SLVRKeyboardLayout", ctrl->getValue().asString()); });
+            getChild<LLComboBox>("vignette")->setCommitCallback([](LLUICtrl* ctrl, const LLSD&)
+                                                                { gSavedSettings.setS32("SLVRVignette", ctrl->getValue().asInteger()); });
+            getChild<LLComboBox>("laser_colour")->setCommitCallback([](LLUICtrl* ctrl, const LLSD&)
+                                                                    { gSavedSettings.setString("SLVRLaserColor", ctrl->getValue().asString()); });
             translate();
             return true;
         }
@@ -108,6 +118,26 @@ namespace
             getChild<LLTextBox>("keyboard_label")->setText(LLVRLanguage::text("keyboard_label"));
             getChild<LLCheckBoxCtrl>("word_suggestions")->setLabel(LLVRLanguage::text("word_suggestions"));
             getChild<LLCheckBoxCtrl>("message_dot_private")->setLabel(LLVRLanguage::text("message_dot_private"));
+            getChild<LLCheckBoxCtrl>("smooth_turn")->setLabel(LLVRLanguage::text("smooth_turn"));
+            getChild<LLTextBox>("vignette_label")->setText(LLVRLanguage::text("vignette_label"));
+            getChild<LLTextBox>("laser_colour_label")->setText(LLVRLanguage::text("laser_colour_label"));
+            getChild<LLSliderCtrl>("laser_opacity")->setLabel(LLVRLanguage::text("laser_opacity"));
+
+            LLComboBox* vignette = getChild<LLComboBox>("vignette");
+            vignette->removeall();
+            const char* const VIGNETTE_LEVELS[] = { "vignette_off", "vignette_low", "vignette_medium", "vignette_high" };
+            for (S32 level = 0; level < 4; ++level)
+            {
+                vignette->add(LLVRLanguage::text(VIGNETTE_LEVELS[level]), LLSD(level));
+            }
+            vignette->setValue(gSavedSettings.getS32("SLVRVignette"));
+            LLComboBox* laser = getChild<LLComboBox>("laser_colour");
+            laser->removeall();
+            for (const char* colour : LASER_COLOURS)
+            {
+                laser->add(LLVRLanguage::text(std::string("laser_") + colour), LLSD(colour));
+            }
+            laser->setValue(gSavedSettings.getString("SLVRLaserColor"));
 
             LLComboBox* language = getChild<LLComboBox>("language");
             LLComboBox* layout = getChild<LLComboBox>("keyboard_layout");

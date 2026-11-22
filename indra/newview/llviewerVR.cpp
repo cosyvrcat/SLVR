@@ -138,9 +138,11 @@ namespace
     const F32 MESSAGE_DOT_RADIUS = 0.012f; // metres, a metre ahead
 
     const F32 SNAP_TURN = 30.f * DEG_TO_RAD;
+    const F32 SMOOTH_TURN_RATE = 120.f * DEG_TO_RAD; // radians per second at full stick, with SLVRSmoothTurn
     const F32 STICK_ON = 0.6f;       // a thumbstick counts as pushed beyond this
     const F32 STICK_OFF = 0.3f;      // and as let go below this
     const F32 LASER_LENGTH = 20.f;   // drawn length when it hits nothing
+    const F32 LASER_MIN_OPACITY = 0.1f; // SLVRLaserOpacity never hides the laser altogether
     const F32 PICK_DISTANCE = 512.f; // as far as the mouse picks
     const F32 FLY_HOLD = 0.5f;       // seconds the right stick is held up before flying starts
     const F32 ZOOM_RATE = 1.5f;      // zoom e-foldings, and orbit radians, per second at full stick
@@ -162,6 +164,68 @@ namespace
     F32 lowPass(F32 cutoff, F32 dt)
     {
         return 1.f - expf(-dt * F_TWO_PI * cutoff);
+    }
+
+    // Comfort vignette, SLVRVignette 1 to 3 (low to high): the angle off the line of sight
+    // where it starts to darken, and where it is black. As in Meta's comfort vignette, moving
+    // and turning both close it in (but not a snap turn, which has no motion to feel), within
+    // VIGNETTE_IN seconds; it opens again within VIGNETTE_OUT once the view is still.
+    const F32 VIGNETTE_CLEAR[3] = { 50.f, 38.f, 26.f }, VIGNETTE_BLACK[3] = { 70.f, 58.f, 45.f }; // degrees
+    const F32 VIGNETTE_IN = 0.25f, VIGNETTE_OUT = 0.5f;
+    const F32 VIGNETTE_JUMP = 5.f;       // metres in one frame: a teleport or region crossing, not motion
+    const F32 VIGNETTE_TURN_STEP = 0.3f; // radians in one frame: a snap turn
+
+    // How far the vignette closes in while the view moves at `speed` (m/s) and turns at
+    // `turn_rate` (rad/s): fully from walking pace, or from 60 degrees a second.
+    F32 vignetteTarget(F32 speed, F32 turn_rate)
+    {
+        const F32 moving = (speed - 0.5f) / 2.5f;
+        const F32 turning = (fabsf(turn_rate) - 10.f * DEG_TO_RAD) / (50.f * DEG_TO_RAD);
+        return llclamp(llmax(moving, turning), 0.f, 1.f);
+    }
+
+    // Change of heading from `from` to `to`, the short way round.
+    F32 headingChange(F32 from, F32 to)
+    {
+        F32 change = fmodf(to - from, F_TWO_PI);
+        if (change > F_PI)
+        {
+            change -= F_TWO_PI;
+        }
+        else if (change < -F_PI)
+        {
+            change += F_TWO_PI;
+        }
+        return change;
+    }
+
+    void checkVignette()
+    {
+        llassert_always(vignetteTarget(0.f, 0.f) == 0.f);
+        llassert_always(vignetteTarget(0.3f, 5.f * DEG_TO_RAD) == 0.f); // standing: an avatar's sway is no motion
+        llassert_always(vignetteTarget(3.2f, 0.f) == 1.f);              // walking
+        llassert_always(vignetteTarget(0.f, -SMOOTH_TURN_RATE) == 1.f); // smooth turning at full stick
+        llassert_always(fabsf(headingChange(179.f * DEG_TO_RAD, -179.f * DEG_TO_RAD) - 2.f * DEG_TO_RAD) < 1e-4f);
+        llassert_always(fabsf(headingChange(-179.f * DEG_TO_RAD, 179.f * DEG_TO_RAD) + 2.f * DEG_TO_RAD) < 1e-4f);
+        llassert_always(fabsf(headingChange(0.f, SNAP_TURN)) > VIGNETTE_TURN_STEP); // a snap turn is told apart
+        llassert_always(SMOOTH_TURN_RATE * 0.1f < VIGNETTE_TURN_STEP);            // smooth turning at 10 fps is not
+    }
+
+    // SLVRLaserColor: the laser's colour by the name the settings window stores; red otherwise.
+    LLColor4 laserColour(const std::string& name)
+    {
+        static const std::pair<const char*, LLColor4> COLOURS[] = {
+            { "orange", LLColor4(1.f, 0.55f, 0.1f) }, { "yellow", LLColor4(1.f, 0.9f, 0.2f) },
+            { "green", LLColor4(0.3f, 1.f, 0.35f) },  { "blue", LLColor4(0.25f, 0.55f, 1.f) },
+            { "purple", LLColor4(0.7f, 0.35f, 1.f) }, { "white", LLColor4(1.f, 1.f, 1.f) } };
+        for (const auto& colour : COLOURS)
+        {
+            if (name == colour.first)
+            {
+                return colour.second;
+            }
+        }
+        return LLColor4(1.f, 0.25f, 0.2f);
     }
 
     // Self-check of the two conversions above; cheap, runs once when VR is switched on.
@@ -197,6 +261,7 @@ void LLViewerVR::updateEnabled()
         checkConventions();
         checkSteady();
         checkPlacement();
+        checkVignette();
         LLVRKeyboard::selfCheck();
         std::string error;
         if (!mBackend.init(error))
@@ -236,7 +301,8 @@ void LLViewerVR::shutdown()
     const bool was_running = mBackend.isInitialized();
     mBackend.shutdown();
     mLaserValid = mPanelHit = mWorldHit = mFirstPerson = mLeftLaserValid = mLeftPanelHit = false;
-    mSteady.valid = mLeftSteady.valid = false;
+    mSteady.valid = mLeftSteady.valid = mMotionValid = false;
+    mVignette = 0.f;
     mKeyboardShown = false;
     mKeyboardWidth = KEYBOARD_WIDTH;
     mKeyboardHit[0] = mKeyboardHit[1] = LLVRKeyboard::Hit();
@@ -324,6 +390,7 @@ void LLViewerVR::beginEye()
         {
             yaw += mZoomYawOffset;
         }
+        updateVignette(yaw);
         mBaseYawCos = cosf(yaw);
         mBaseYawSin = sinf(yaw);
         mEye = 0;
@@ -375,6 +442,7 @@ bool LLViewerVR::endEye()
         return false;
     }
 
+    drawVignette(); // under the lasers: what is pointed at stays seen
     if (mLaserValid)
     {
         drawLaser(mLaserStart, mLaserDir, mLaserLength);
@@ -748,14 +816,92 @@ void LLViewerVR::overridePickRay(LLVector3& start, LLVector3& end, F32 depth) co
 // Draws the laser into the eye that has just been rendered, over everything else.
 void LLViewerVR::drawLaser(const LLVector3& start, const LLVector3& dir, F32 length)
 {
+    static LLCachedControl<std::string> colour_name(gSavedSettings, "SLVRLaserColor", "red");
+    static LLCachedControl<F32> opacity(gSavedSettings, "SLVRLaserOpacity", 1.f);
+    LLColor4 colour = laserColour(colour_name);
+    colour.mV[VALPHA] = llclamp((F32)opacity, LASER_MIN_OPACITY, 1.f);
+
     gViewerWindow->setup3DRender(); // this eye's matrices; render_ui() left its own behind
     LLGLSUIDefault gls_ui;
+    gGL.setSceneBlendType(LLRender::BT_ALPHA);
     gUIProgram.bind();
     gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
     gGL.begin(LLRender::LINES);
-    gGL.color3f(1.f, 0.25f, 0.2f);
+    gGL.color4fv(colour.mV);
     gGL.vertex3fv(start.mV);
     gGL.vertex3fv((start + dir * length).mV);
+    gGL.end();
+    gGL.flush();
+    gUIProgram.unbind();
+}
+
+// Closes the comfort vignette in while the view moves or turns by itself: walking, flying,
+// riding, the zoom camera, smooth turning. Measured on the view rather than on the sticks,
+// so whatever moves it counts; the head's own movement is not part of it.
+void LLViewerVR::updateVignette(F32 yaw)
+{
+    const F32 dt = mMotionTimer.getElapsedTimeAndResetF32();
+    F32 target = 0.f;
+    if (mMotionValid && mFirstPerson == mMotionFirstPerson && dt > 0.f) // the zoom starting or ending is a jump
+    {
+        const F32 moved = (mBaseOrigin - mMotionOrigin).length();
+        const F32 turned = headingChange(mMotionYaw, yaw);
+        target = vignetteTarget(moved < VIGNETTE_JUMP ? moved / dt : 0.f,
+                                fabsf(turned) < VIGNETTE_TURN_STEP ? turned / dt : 0.f);
+    }
+    mMotionValid = true;
+    mMotionFirstPerson = mFirstPerson;
+    mMotionOrigin = mBaseOrigin;
+    mMotionYaw = yaw;
+    const F32 step = llmin(dt, 0.1f) / (target > mVignette ? VIGNETTE_IN : VIGNETTE_OUT);
+    mVignette = target > mVignette ? llmin(target, mVignette + step) : llmax(target, mVignette - step);
+}
+
+// Draws the comfort vignette into the eye just rendered: dark all round the line of sight,
+// hiding the edges of the view, where motion is felt most. Fully open it lies just past the
+// image's farthest corner; it closes in to the size its setting gives.
+void LLViewerVR::drawVignette()
+{
+    static LLCachedControl<S32> level(gSavedSettings, "SLVRVignette", 2);
+    if (level < 1 || mVignette <= 0.f)
+    {
+        return;
+    }
+    const S32 size = llmin((S32)level, 3) - 1;
+    const F32* tan = mEyes[mEye].tan_fov; // left, right, up, down
+    const LLRect view = gViewerWindow->getWorldViewRectRaw();
+    const F32 corner = sqrtf(llmax(tan[0] * tan[0], tan[1] * tan[1]) + llmax(tan[2] * tan[2], tan[3] * tan[3]));
+    const F32 clear = tanf(VIGNETTE_CLEAR[size] * DEG_TO_RAD), black = tanf(VIGNETTE_BLACK[size] * DEG_TO_RAD);
+    const F32 inner = corner + (clear - corner) * mVignette;
+    const F32 radii[3] = { inner, inner + black - clear, llmax(inner + black - clear, corner) + 1.f }; // tangents
+    const F32 alphas[3] = { 0.f, 1.f, 1.f };
+    auto vertex = [&](S32 ring, F32 angle)
+    {
+        gGL.color4f(0.f, 0.f, 0.f, alphas[ring]);
+        gGL.vertex2f(view.mLeft + (radii[ring] * cosf(angle) - tan[0]) / (tan[1] - tan[0]) * view.getWidth(),
+                     view.mBottom + (radii[ring] * sinf(angle) - tan[3]) / (tan[2] - tan[3]) * view.getHeight());
+    };
+
+    gViewerWindow->setup2DRender(); // window pixels
+    LLGLSUIDefault gls_ui;
+    gGL.setSceneBlendType(LLRender::BT_ALPHA);
+    gUIProgram.bind();
+    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+    gGL.begin(LLRender::TRIANGLES);
+    const S32 STEPS = 48;
+    for (S32 i = 0; i < STEPS; ++i)
+    {
+        const F32 a0 = F_TWO_PI * i / STEPS, a1 = F_TWO_PI * (i + 1) / STEPS;
+        for (S32 ring = 0; ring < 2; ++ring) // the feathered edge, then black out past the corners
+        {
+            vertex(ring, a0);
+            vertex(ring + 1, a0);
+            vertex(ring + 1, a1);
+            vertex(ring, a0);
+            vertex(ring + 1, a1);
+            vertex(ring, a1);
+        }
+    }
     gGL.end();
     gGL.flush();
     gUIProgram.unbind();
@@ -1514,7 +1660,8 @@ void LLViewerVR::applyInput()
         startZoom();
     }
 
-    // Right stick: sideways turns in steps, one step per push; up and down is jump/fly up
+    // Right stick: sideways turns in steps, one step per push, or smoothly (SLVRSmoothTurn) at
+    // a rate that grows with the push past the dead zone; up and down is jump/fly up
     // and crouch/fly down like Page Up and Page Down, and held up it starts flying.
     const F32 x = input.turn[0], y = input.turn[1];
     const bool zooming = input.zoom && !mZoomOnKeyboard && mZoomStarted && !gAgentCamera.getFocusOnAvatar();
@@ -1554,9 +1701,18 @@ void LLViewerVR::applyInput()
             gAgentCamera.cameraOrbitAround(-x * step);
         }
     }
+    static LLCachedControl<bool> smooth_turn(gSavedSettings, "SLVRSmoothTurn", false);
     if (fabsf(x) < STICK_OFF)
     {
         mTurned = false;
+    }
+    else if (smooth_turn)
+    {
+        if (stick_free && fabsf(x) >= fabsf(y))
+        {
+            const F32 push = (fabsf(x) - STICK_OFF) / (1.f - STICK_OFF);
+            gAgent.yaw((x > 0.f ? -1.f : 1.f) * push * SMOOTH_TURN_RATE * llmin((F32)gFrameIntervalSeconds, 0.1f));
+        }
     }
     else if (stick_free && !mTurned && fabsf(x) > STICK_ON && fabsf(x) >= fabsf(y))
     {

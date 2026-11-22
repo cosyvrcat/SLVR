@@ -3,7 +3,7 @@
 <floater
  legacy_header_height="18"
  can_resize="false"
- height="154"
+ height="282"
  layout="topleft"
  name="slvr_settings"
  single_instance="true"
@@ -66,4 +66,65 @@
      name="message_dot_private"
      top="124"
      width="395" />
+    <check_box
+     control_name="SLVRSmoothTurn"
+     follows="left|top"
+     height="16"
+     label="Smooth turning (off: 30 degree steps)"
+     layout="topleft"
+     left="12"
+     name="smooth_turn"
+     top="150"
+     width="395" />
+    <text
+     follows="left|top"
+     height="16"
+     layout="topleft"
+     left="12"
+     name="vignette_label"
+     top="182"
+     width="170">
+        Comfort vignette:
+    </text>
+    <combo_box
+     follows="left|top"
+     height="23"
+     layout="topleft"
+     left="185"
+     name="vignette"
+     top="178"
+     width="220" />
+    <text
+     follows="left|top"
+     height="16"
+     layout="topleft"
+     left="12"
+     name="laser_colour_label"
+     top="214"
+     width="170">
+        Laser colour:
+    </text>
+    <combo_box
+     follows="left|top"
+     height="23"
+     layout="topleft"
+     left="185"
+     name="laser_colour"
+     top="210"
+     width="220" />
+    <slider
+     control_name="SLVRLaserOpacity"
+     decimal_digits="2"
+     follows="left|top"
+     height="16"
+     increment="0.05"
+     label="Laser opacity:"
+     label_width="170"
+     layout="topleft"
+     left="12"
+     max_val="1"
+     min_val="0.1"
+     name="laser_opacity"
+     top="246"
+     width="393" />
 </floater>

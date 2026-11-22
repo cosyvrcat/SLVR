@@ -23,6 +23,21 @@
       <key>keyboard_label</key><string>Keyboard layout:</string>
       <key>word_suggestions</key><string>Word suggestions and next-word prediction</string>
       <key>message_dot_private</key><string>Message dot only for private chats</string>
+      <key>smooth_turn</key><string>Smooth turning (off: 30 degree steps)</string>
+      <key>vignette_label</key><string>Comfort vignette:</string>
+      <key>vignette_off</key><string>Off</string>
+      <key>vignette_low</key><string>Low</string>
+      <key>vignette_medium</key><string>Medium</string>
+      <key>vignette_high</key><string>High</string>
+      <key>laser_colour_label</key><string>Laser colour:</string>
+      <key>laser_red</key><string>Red</string>
+      <key>laser_orange</key><string>Orange</string>
+      <key>laser_yellow</key><string>Yellow</string>
+      <key>laser_green</key><string>Green</string>
+      <key>laser_blue</key><string>Blue</string>
+      <key>laser_purple</key><string>Purple</string>
+      <key>laser_white</key><string>White</string>
+      <key>laser_opacity</key><string>Laser opacity:</string>
       <key>same_as_viewer</key><string>Same as Firestorm</string>
       <key>same_as_language</key><string>Same as SLVR language</string>
       <key>screenshot_saved</key><string>VR screenshot saved: [PATH]</string>
@@ -48,6 +63,21 @@
       <key>keyboard_label</key><string>Klavye düzeni:</string>
       <key>word_suggestions</key><string>Kelime önerileri ve sonraki kelime tahmini</string>
       <key>message_dot_private</key><string>Mesaj noktası yalnızca özel sohbetler için</string>
+      <key>smooth_turn</key><string>Kesintisiz dönüş (kapalıyken 30 derecelik adımlar)</string>
+      <key>vignette_label</key><string>Konfor vinyeti:</string>
+      <key>vignette_off</key><string>Kapalı</string>
+      <key>vignette_low</key><string>Düşük</string>
+      <key>vignette_medium</key><string>Orta</string>
+      <key>vignette_high</key><string>Yüksek</string>
+      <key>laser_colour_label</key><string>Lazer rengi:</string>
+      <key>laser_red</key><string>Kırmızı</string>
+      <key>laser_orange</key><string>Turuncu</string>
+      <key>laser_yellow</key><string>Sarı</string>
+      <key>laser_green</key><string>Yeşil</string>
+      <key>laser_blue</key><string>Mavi</string>
+      <key>laser_purple</key><string>Mor</string>
+      <key>laser_white</key><string>Beyaz</string>
+      <key>laser_opacity</key><string>Lazer opaklığı:</string>
       <key>same_as_viewer</key><string>Firestorm ile aynı</string>
       <key>same_as_language</key><string>SLVR diliyle aynı</string>
       <key>screenshot_saved</key><string>VR ekran görüntüsü kaydedildi: [PATH]</string>
@@ -73,6 +103,21 @@
       <key>keyboard_label</key><string>Klaviatura düzümü:</string>
       <key>word_suggestions</key><string>Söz təklifləri və növbəti söz proqnozu</string>
       <key>message_dot_private</key><string>Mesaj nöqtəsi yalnız şəxsi söhbətlər üçün</string>
+      <key>smooth_turn</key><string>Hamar dönmə (söndürüləndə 30 dərəcəlik addımlar)</string>
+      <key>vignette_label</key><string>Rahatlıq vinyeti:</string>
+      <key>vignette_off</key><string>Söndürülüb</string>
+      <key>vignette_low</key><string>Aşağı</string>
+      <key>vignette_medium</key><string>Orta</string>
+      <key>vignette_high</key><string>Yüksək</string>
+      <key>laser_colour_label</key><string>Lazer rəngi:</string>
+      <key>laser_red</key><string>Qırmızı</string>
+      <key>laser_orange</key><string>Narıncı</string>
+      <key>laser_yellow</key><string>Sarı</string>
+      <key>laser_green</key><string>Yaşıl</string>
+      <key>laser_blue</key><string>Mavi</string>
+      <key>laser_purple</key><string>Bənövşəyi</string>
+      <key>laser_white</key><string>Ağ</string>
+      <key>laser_opacity</key><string>Lazer qeyri-şəffaflığı:</string>
       <key>same_as_viewer</key><string>Firestorm ilə eyni</string>
       <key>same_as_language</key><string>SLVR dili ilə eyni</string>
       <key>screenshot_saved</key><string>VR ekran şəkli saxlanıldı: [PATH]</string>
@@ -98,6 +143,21 @@
       <key>keyboard_label</key><string>Tastaturlayout:</string>
       <key>word_suggestions</key><string>Ordforslag og forudsigelse af næste ord</string>
       <key>message_dot_private</key><string>Beskedprik kun for private samtaler</string>
+      <key>smooth_turn</key><string>Glidende drejning (fra: trin på 30 grader)</string>
+      <key>vignette_label</key><string>Komfortvignet:</string>
+      <key>vignette_off</key><string>Fra</string>
+      <key>vignette_low</key><string>Lav</string>
+      <key>vignette_medium</key><string>Middel</string>
+      <key>vignette_high</key><string>Høj</string>
+      <key>laser_colour_label</key><string>Laserfarve:</string>
+      <key>laser_red</key><string>Rød</string>
+      <key>laser_orange</key><string>Orange</string>
+      <key>laser_yellow</key><string>Gul</string>
+      <key>laser_green</key><string>Grøn</string>
+      <key>laser_blue</key><string>Blå</string>
+      <key>laser_purple</key><string>Lilla</string>
+      <key>laser_white</key><string>Hvid</string>
+      <key>laser_opacity</key><string>Laserens dækkevne:</string>
       <key>same_as_viewer</key><string>Samme som Firestorm</string>
       <key>same_as_language</key><string>Samme som SLVR-sprog</string>
       <key>screenshot_saved</key><string>VR-skærmbillede gemt: [PATH]</string>
@@ -123,6 +183,21 @@
       <key>keyboard_label</key><string>Tastaturlayout:</string>
       <key>word_suggestions</key><string>Wortvorschläge und Vorhersage des nächsten Worts</string>
       <key>message_dot_private</key><string>Nachrichtenpunkt nur für private Chats</string>
+      <key>smooth_turn</key><string>Stufenloses Drehen (aus: 30-Grad-Schritte)</string>
+      <key>vignette_label</key><string>Komfort-Vignette:</string>
+      <key>vignette_off</key><string>Aus</string>
+      <key>vignette_low</key><string>Gering</string>
+      <key>vignette_medium</key><string>Mittel</string>
+      <key>vignette_high</key><string>Stark</string>
+      <key>laser_colour_label</key><string>Laserfarbe:</string>
+      <key>laser_red</key><string>Rot</string>
+      <key>laser_orange</key><string>Orange</string>
+      <key>laser_yellow</key><string>Gelb</string>
+      <key>laser_green</key><string>Grün</string>
+      <key>laser_blue</key><string>Blau</string>
+      <key>laser_purple</key><string>Lila</string>
+      <key>laser_white</key><string>Weiß</string>
+      <key>laser_opacity</key><string>Laser-Deckkraft:</string>
       <key>same_as_viewer</key><string>Wie Firestorm</string>
       <key>same_as_language</key><string>Wie SLVR-Sprache</string>
       <key>screenshot_saved</key><string>VR-Screenshot gespeichert: [PATH]</string>
@@ -148,6 +223,21 @@
       <key>keyboard_label</key><string>Distribución del teclado:</string>
       <key>word_suggestions</key><string>Sugerencias de palabras y predicción de la siguiente</string>
       <key>message_dot_private</key><string>Punto de mensaje solo para chats privados</string>
+      <key>smooth_turn</key><string>Giro suave (desactivado: pasos de 30 grados)</string>
+      <key>vignette_label</key><string>Viñeta de confort:</string>
+      <key>vignette_off</key><string>Desactivada</string>
+      <key>vignette_low</key><string>Baja</string>
+      <key>vignette_medium</key><string>Media</string>
+      <key>vignette_high</key><string>Alta</string>
+      <key>laser_colour_label</key><string>Color del láser:</string>
+      <key>laser_red</key><string>Rojo</string>
+      <key>laser_orange</key><string>Naranja</string>
+      <key>laser_yellow</key><string>Amarillo</string>
+      <key>laser_green</key><string>Verde</string>
+      <key>laser_blue</key><string>Azul</string>
+      <key>laser_purple</key><string>Morado</string>
+      <key>laser_white</key><string>Blanco</string>
+      <key>laser_opacity</key><string>Opacidad del láser:</string>
       <key>same_as_viewer</key><string>Igual que Firestorm</string>
       <key>same_as_language</key><string>Igual que el idioma de SLVR</string>
       <key>screenshot_saved</key><string>Captura VR guardada: [PATH]</string>
@@ -173,6 +263,21 @@
       <key>keyboard_label</key><string>Disposition du clavier :</string>
       <key>word_suggestions</key><string>Suggestions de mots et prédiction du mot suivant</string>
       <key>message_dot_private</key><string>Point de message uniquement pour les discussions privées</string>
+      <key>smooth_turn</key><string>Rotation fluide (désactivée : par pas de 30 degrés)</string>
+      <key>vignette_label</key><string>Vignette de confort :</string>
+      <key>vignette_off</key><string>Désactivée</string>
+      <key>vignette_low</key><string>Faible</string>
+      <key>vignette_medium</key><string>Moyenne</string>
+      <key>vignette_high</key><string>Forte</string>
+      <key>laser_colour_label</key><string>Couleur du laser :</string>
+      <key>laser_red</key><string>Rouge</string>
+      <key>laser_orange</key><string>Orange</string>
+      <key>laser_yellow</key><string>Jaune</string>
+      <key>laser_green</key><string>Vert</string>
+      <key>laser_blue</key><string>Bleu</string>
+      <key>laser_purple</key><string>Violet</string>
+      <key>laser_white</key><string>Blanc</string>
+      <key>laser_opacity</key><string>Opacité du laser :</string>
       <key>same_as_viewer</key><string>Comme Firestorm</string>
       <key>same_as_language</key><string>Comme la langue de SLVR</string>
       <key>screenshot_saved</key><string>Capture VR enregistrée : [PATH]</string>
@@ -198,6 +303,21 @@
       <key>keyboard_label</key><string>Layout tastiera:</string>
       <key>word_suggestions</key><string>Suggerimenti di parole e previsione della successiva</string>
       <key>message_dot_private</key><string>Punto messaggi solo per le chat private</string>
+      <key>smooth_turn</key><string>Rotazione fluida (disattivata: scatti di 30 gradi)</string>
+      <key>vignette_label</key><string>Vignettatura di comfort:</string>
+      <key>vignette_off</key><string>Disattivata</string>
+      <key>vignette_low</key><string>Bassa</string>
+      <key>vignette_medium</key><string>Media</string>
+      <key>vignette_high</key><string>Alta</string>
+      <key>laser_colour_label</key><string>Colore del laser:</string>
+      <key>laser_red</key><string>Rosso</string>
+      <key>laser_orange</key><string>Arancione</string>
+      <key>laser_yellow</key><string>Giallo</string>
+      <key>laser_green</key><string>Verde</string>
+      <key>laser_blue</key><string>Blu</string>
+      <key>laser_purple</key><string>Viola</string>
+      <key>laser_white</key><string>Bianco</string>
+      <key>laser_opacity</key><string>Opacità del laser:</string>
       <key>same_as_viewer</key><string>Come Firestorm</string>
       <key>same_as_language</key><string>Come la lingua di SLVR</string>
       <key>screenshot_saved</key><string>Screenshot VR salvato: [PATH]</string>
@@ -223,6 +343,21 @@
       <key>keyboard_label</key><string>Układ klawiatury:</string>
       <key>word_suggestions</key><string>Podpowiedzi słów i przewidywanie następnego słowa</string>
       <key>message_dot_private</key><string>Kropka wiadomości tylko dla prywatnych rozmów</string>
+      <key>smooth_turn</key><string>Płynny obrót (wyłączony: skoki co 30 stopni)</string>
+      <key>vignette_label</key><string>Winieta komfortu:</string>
+      <key>vignette_off</key><string>Wyłączona</string>
+      <key>vignette_low</key><string>Niska</string>
+      <key>vignette_medium</key><string>Średnia</string>
+      <key>vignette_high</key><string>Wysoka</string>
+      <key>laser_colour_label</key><string>Kolor lasera:</string>
+      <key>laser_red</key><string>Czerwony</string>
+      <key>laser_orange</key><string>Pomarańczowy</string>
+      <key>laser_yellow</key><string>Żółty</string>
+      <key>laser_green</key><string>Zielony</string>
+      <key>laser_blue</key><string>Niebieski</string>
+      <key>laser_purple</key><string>Fioletowy</string>
+      <key>laser_white</key><string>Biały</string>
+      <key>laser_opacity</key><string>Krycie lasera:</string>
       <key>same_as_viewer</key><string>Jak w Firestorm</string>
       <key>same_as_language</key><string>Jak język SLVR</string>
       <key>screenshot_saved</key><string>Zapisano zrzut ekranu VR: [PATH]</string>
@@ -248,6 +383,21 @@
       <key>keyboard_label</key><string>Layout do teclado:</string>
       <key>word_suggestions</key><string>Sugestões de palavras e previsão da próxima</string>
       <key>message_dot_private</key><string>Ponto de mensagem só para conversas privadas</string>
+      <key>smooth_turn</key><string>Giro suave (desligado: passos de 30 graus)</string>
+      <key>vignette_label</key><string>Vinheta de conforto:</string>
+      <key>vignette_off</key><string>Desligada</string>
+      <key>vignette_low</key><string>Baixa</string>
+      <key>vignette_medium</key><string>Média</string>
+      <key>vignette_high</key><string>Alta</string>
+      <key>laser_colour_label</key><string>Cor do laser:</string>
+      <key>laser_red</key><string>Vermelho</string>
+      <key>laser_orange</key><string>Laranja</string>
+      <key>laser_yellow</key><string>Amarelo</string>
+      <key>laser_green</key><string>Verde</string>
+      <key>laser_blue</key><string>Azul</string>
+      <key>laser_purple</key><string>Roxo</string>
+      <key>laser_white</key><string>Branco</string>
+      <key>laser_opacity</key><string>Opacidade do laser:</string>
       <key>same_as_viewer</key><string>Igual ao Firestorm</string>
       <key>same_as_language</key><string>Igual ao idioma do SLVR</string>
       <key>screenshot_saved</key><string>Captura VR salva: [PATH]</string>
@@ -273,6 +423,21 @@
       <key>keyboard_label</key><string>Раскладка клавиатуры:</string>
       <key>word_suggestions</key><string>Подсказки слов и предсказание следующего слова</string>
       <key>message_dot_private</key><string>Точка сообщений только для личных чатов</string>
+      <key>smooth_turn</key><string>Плавный поворот (выкл.: шагами по 30 градусов)</string>
+      <key>vignette_label</key><string>Виньетка комфорта:</string>
+      <key>vignette_off</key><string>Выкл.</string>
+      <key>vignette_low</key><string>Слабая</string>
+      <key>vignette_medium</key><string>Средняя</string>
+      <key>vignette_high</key><string>Сильная</string>
+      <key>laser_colour_label</key><string>Цвет лазера:</string>
+      <key>laser_red</key><string>Красный</string>
+      <key>laser_orange</key><string>Оранжевый</string>
+      <key>laser_yellow</key><string>Жёлтый</string>
+      <key>laser_green</key><string>Зелёный</string>
+      <key>laser_blue</key><string>Синий</string>
+      <key>laser_purple</key><string>Фиолетовый</string>
+      <key>laser_white</key><string>Белый</string>
+      <key>laser_opacity</key><string>Непрозрачность лазера:</string>
       <key>same_as_viewer</key><string>Как в Firestorm</string>
       <key>same_as_language</key><string>Как язык SLVR</string>
       <key>screenshot_saved</key><string>Снимок VR сохранён: [PATH]</string>
@@ -292,6 +457,21 @@
       <key>keyboard_label</key><string>キーボード配列:</string>
       <key>word_suggestions</key><string>単語の候補と次の単語の予測</string>
       <key>message_dot_private</key><string>メッセージの点は個人チャットのみ</string>
+      <key>smooth_turn</key><string>スムーズターン (オフ: 30度ずつ回転)</string>
+      <key>vignette_label</key><string>快適ビネット:</string>
+      <key>vignette_off</key><string>オフ</string>
+      <key>vignette_low</key><string>弱</string>
+      <key>vignette_medium</key><string>中</string>
+      <key>vignette_high</key><string>強</string>
+      <key>laser_colour_label</key><string>レーザーの色:</string>
+      <key>laser_red</key><string>赤</string>
+      <key>laser_orange</key><string>オレンジ</string>
+      <key>laser_yellow</key><string>黄</string>
+      <key>laser_green</key><string>緑</string>
+      <key>laser_blue</key><string>青</string>
+      <key>laser_purple</key><string>紫</string>
+      <key>laser_white</key><string>白</string>
+      <key>laser_opacity</key><string>レーザーの不透明度:</string>
       <key>same_as_viewer</key><string>Firestormと同じ</string>
       <key>same_as_language</key><string>SLVRの言語と同じ</string>
       <key>screenshot_saved</key><string>VRスクリーンショットを保存しました: [PATH]</string>
@@ -311,6 +491,21 @@
       <key>keyboard_label</key><string>键盘布局:</string>
       <key>word_suggestions</key><string>单词建议与下一个词预测</string>
       <key>message_dot_private</key><string>消息提示点仅用于私聊</string>
+      <key>smooth_turn</key><string>平滑转向 (关闭时: 每次30度)</string>
+      <key>vignette_label</key><string>舒适晕影:</string>
+      <key>vignette_off</key><string>关闭</string>
+      <key>vignette_low</key><string>低</string>
+      <key>vignette_medium</key><string>中</string>
+      <key>vignette_high</key><string>高</string>
+      <key>laser_colour_label</key><string>激光颜色:</string>
+      <key>laser_red</key><string>红色</string>
+      <key>laser_orange</key><string>橙色</string>
+      <key>laser_yellow</key><string>黄色</string>
+      <key>laser_green</key><string>绿色</string>
+      <key>laser_blue</key><string>蓝色</string>
+      <key>laser_purple</key><string>紫色</string>
+      <key>laser_white</key><string>白色</string>
+      <key>laser_opacity</key><string>激光不透明度:</string>
       <key>same_as_viewer</key><string>与Firestorm相同</string>
       <key>same_as_language</key><string>与SLVR语言相同</string>
       <key>screenshot_saved</key><string>VR截图已保存: [PATH]</string>

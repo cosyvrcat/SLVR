@@ -90,6 +90,8 @@ private:
     void placePanel(const LLView* around);
     void noteMessage(const LLUUID& from);
     void drawLaser(const LLVector3& start, const LLVector3& dir, F32 length);
+    void updateVignette(F32 yaw);
+    void drawVignette();
     // A screenshot's quad layers: their image and where they were.
     struct ShotLayer
     {
@@ -197,6 +199,14 @@ private:
     LLVector3 mBaseOrigin, mBaseAt, mBaseLeft, mBaseUp;
     F32 mBaseYawCos = 1.f, mBaseYawSin = 0.f;
     F32 mYawOffset = 0.f; // tracking space heading relative to the avatar's, see applyInput()
+
+    // Comfort vignette (see updateVignette()): how far it has closed in, 0 open to 1 at its
+    // setting's size, and last frame's view, which it compares against.
+    F32 mVignette = 0.f;
+    bool mMotionValid = false, mMotionFirstPerson = false;
+    LLVector3 mMotionOrigin;
+    F32 mMotionYaw = 0.f;
+    LLFrameTimer mMotionTimer;
 };
 
 extern LLViewerVR gVR;
