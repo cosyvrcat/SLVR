@@ -1421,6 +1421,11 @@ void LLViewerVR::drawControllers()
     const F32 HALF[3] = { 0.018f, 0.015f, 0.055f }; // metres along the controller's right, up and forward
     const float RIGHT[3] = { 1.f, 0.f, 0.f }, UP[3] = { 0.f, 1.f, 0.f }, FORWARD[3] = { 0.f, 0.f, -1.f };
     static LLCachedControl<bool> left_handed(gSavedSettings, "SLVRLeftHanded", false);
+    static LLCachedControl<bool> show(gSavedSettings, "SLVRShowControllers", true);
+    if (!show)
+    {
+        return; // the lasers alone
+    }
     gViewerWindow->setup3DRender();
     LLGLSUIDefault gls_ui;
     LLGLEnable cull(GL_CULL_FACE); // closed shapes: the faces turned to the eye alone draw them

@@ -77,7 +77,7 @@ This repository holds **source code only**. No builds are published here.
 - A left-handed mode that swaps the controllers.
 - Your real controllers in your hands: Meta Quest Touch Plus models, textured, from Meta's
   own controller art (see [Controller models](#controller-models)). Without them, simple
-  boxes show where your hands are.
+  boxes show where your hands are. They can be hidden, leaving only the lasers.
 - VR screenshots of what the right eye sees, panel and keyboard included, saved as PNG files
   to `Pictures\SLVR`.
 
@@ -173,7 +173,7 @@ the headset before the next one builds on it.
 
 | Version | What it added |
 | --- | --- |
-| 0.6.1 | Meta Quest Touch Plus controller models |
+| 0.6.1 | Meta Quest Touch Plus controller models, with an option to hide the controllers |
 | 0.6.0 | Arc teleport, push-to-talk, recentring, running, haptics, wrist menu, curved panel, left-handed mode, own-height mode, script camera guard, VR text scale, lighter VR graphics, two-column settings |
 | 0.5.5 | Smooth turning, comfort vignette, laser colour and opacity |
 | 0.5.4 | See-through HUDs; panel, dialogs and keyboard open where you look |

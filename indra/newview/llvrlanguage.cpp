@@ -135,7 +135,8 @@ namespace
             getChild<LLTextBox>("vignette_label")->setText(LLVRLanguage::text("vignette_label"));
             getChild<LLTextBox>("laser_colour_label")->setText(LLVRLanguage::text("laser_colour_label"));
             getChild<LLSliderCtrl>("laser_opacity")->setLabel(LLVRLanguage::text("laser_opacity"));
-            for (const char* name : { "blink", "left_handed", "ignore_script_camera", "haptics", "curved_panel", "panel_follow", "performance_preset" })
+            for (const char* name : { "blink", "left_handed", "ignore_script_camera", "haptics", "show_controllers", "curved_panel",
+                                      "panel_follow", "performance_preset" })
             {
                 getChild<LLCheckBoxCtrl>(name)->setLabel(LLVRLanguage::text(name));
             }

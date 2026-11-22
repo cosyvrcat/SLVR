@@ -3,7 +3,7 @@
 <floater
  legacy_header_height="18"
  can_resize="false"
- height="368"
+ height="398"
  layout="topleft"
  name="slvr_settings"
  single_instance="true"
@@ -110,6 +110,16 @@
      top="214"
      width="403" />
     <check_box
+     control_name="SLVRShowControllers"
+     follows="left|top"
+     height="16"
+     label="Show the controllers (off: lasers only)"
+     layout="topleft"
+     left="12"
+     name="show_controllers"
+     top="244"
+     width="403" />
+    <check_box
      control_name="SLVRCurvedPanel"
      follows="left|top"
      height="16"
@@ -117,7 +127,7 @@
      layout="topleft"
      left="12"
      name="curved_panel"
-     top="244"
+     top="274"
      width="403" />
     <check_box
      control_name="SLVRPanelFollow"
@@ -127,7 +137,7 @@
      layout="topleft"
      left="12"
      name="panel_follow"
-     top="274"
+     top="304"
      width="403" />
     <slider
      control_name="SLVRWorldTextScale"
@@ -142,7 +152,7 @@
      max_val="3"
      min_val="0.5"
      name="text_scale"
-     top="304"
+     top="334"
      width="401" />
     <check_box
      control_name="SLVRVRGraphics"
@@ -152,7 +162,7 @@
      layout="topleft"
      left="12"
      name="performance_preset"
-     top="334"
+     top="364"
      width="403" />
     <check_box
      control_name="SLVRSmoothTurn"
