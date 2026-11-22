@@ -41,24 +41,27 @@ This repository holds **source code only**. No builds are published here.
   attachments are hidden so they do not block the view.
 - Eye height comes from the avatar, or from your own height. Your height can be entered by
   hand or measured with the headset.
-- Name tags and floating text are scaled for the headset, with an adjustable size.
+- Name tags and floating text are sized for the headset's own field of view.
 - An optional lighter-graphics preset for VR (shadows, reflections, depth of field, mirrors
-  and draw distance). Your saved settings are never touched; they come back as soon as VR
-  is switched off.
+  and draw distance) that takes effect as soon as it is switched. Your saved settings are
+  never touched; they come back as soon as the preset or VR is switched off.
 
 ### Moving
-- **Walking and strafing** with the left stick, and running when the stick is pushed all the
-  way. You walk where you look, or optionally where your left hand points.
+- **Walking and strafing** with the left stick, and running when the stick is held all the
+  way for a moment; a short vibration tells you that you are running. You walk where you
+  look, or optionally where your left hand points.
 - **Turning** with the right stick, in steps of 15°, 30°, 45° or 90°, or smoothly at an
   adjustable speed.
 - **Flying.** Hold the right stick up to take off; push up or down to rise or sink.
-- **Arc teleport.** Hold A to aim a falling arc and release to go there. The arc refuses
-  walls, steep surfaces and places where RLVa does not allow you to go.
+- **Arc teleport.** Hold A to aim a falling arc, reaching some 20 metres, and release to go
+  there. The arc refuses walls, steep surfaces and places where RLVa does not allow you to go.
 - **Recentre.** Hold X to make the way you face now straight ahead.
 
 ### Comfort
 - A comfort vignette with Off, Low, Medium and High levels. It is triggered by real view
-  motion (walking, flying, vehicles, camera moves), not by head movement.
+  motion (walking, flying, vehicles, camera moves), not by head movement. It closes as you
+  start moving, stays while you move and opens shortly after you stop; rising and sinking
+  count less than moving forward.
 - A short blink to black over snap turns and teleports.
 - A script or seat that takes over the camera does not drag your view around. This can be
   switched off.
@@ -72,8 +75,10 @@ This repository holds **source code only**. No builds are published here.
 - Haptic ticks as the laser crosses keys and buttons, and a firmer pulse on press.
 - A wrist menu: look at your left controller for quick buttons (panel, chat, settings, photo,
   recentre, fly / land / stand up).
-- A chat-only mode that shows just the conversation window, and a glowing dot for unread
-  messages (private chats only by default).
+- A chat-only mode that shows just the conversation window where it was on the full panel,
+  together with any open script dialogs. Drag a window by its title bar to move it anywhere
+  around you. A glowing dot shows unread messages (private chats only by default).
+- Context and pie menus open where you look; a trigger press beside one closes it.
 - A left-handed mode that swaps the controllers.
 - Your real controllers in your hands: Meta Quest Touch Plus models, textured, from Meta's
   own controller art (see [Controller models](#controller-models)). Without them, simple
@@ -83,7 +88,8 @@ This repository holds **source code only**. No builds are published here.
 
 ### On-screen keyboard
 - A keyboard on its own layer that can be typed with both hands, with a symbols page,
-  emoticons, a repeating backspace, shift and caps lock.
+  emoticons, a repeating backspace, shift and caps lock. It comes up when you press a text
+  field, low in front of you and tilted back, so you can type with your arms resting.
 - Word completion and next-word prediction, learned locally from your own chat logs.
 - Layouts for English, Turkish, Azerbaijani, Danish, German, Spanish, French, Italian, Polish,
   Portuguese and Russian.
@@ -101,12 +107,12 @@ button stays on the left.
 | Control | Action |
 | --- | --- |
 | Right trigger | Left click (UI or world) |
-| Right grip | Right click: context and pie menus |
+| Right grip | Right click: context and pie menus, opened where you look |
 | Right stick left/right | Turn (snap or smooth) |
 | Right stick up/down | Jump or crouch; held up, start flying; rise or sink while flying |
 | **A** (hold) | Aim the teleport arc; release to teleport |
 | **B** | Push to talk (follows your voice settings: hold or toggle) |
-| Left stick | Walk and strafe; push fully to run |
+| Left stick | Walk and strafe; hold fully to run |
 | Left trigger | Type on the keyboard; elsewhere, hold to zoom the camera to what the laser points at, then use the right stick to zoom and orbit |
 | Left grip (hold) | Grab the panel; the right stick moves it nearer or further and resizes it |
 | **X** (hold) | Recentre |
@@ -173,6 +179,7 @@ the headset before the next one builds on it.
 
 | Version | What it added |
 | --- | --- |
+| 0.6.2 | Keyboard only on text fields and at the waist, chat window stays put and moves in space, steadier vignette, menus where you look, longer teleport, clearer running, instant lighter-graphics switch |
 | 0.6.1 | Meta Quest Touch Plus controller models, with an option to hide the controllers |
 | 0.6.0 | Arc teleport, push-to-talk, recentring, running, haptics, wrist menu, curved panel, left-handed mode, own-height mode, script camera guard, VR text scale, lighter VR graphics, two-column settings |
 | 0.5.5 | Smooth turning, comfort vignette, laser colour and opacity |
