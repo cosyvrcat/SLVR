@@ -42,6 +42,7 @@
 #include "llviewerjointattachment.h"
 #include "llviewerobject.h"
 #include "llviewershadermgr.h"
+#include "llviewertexture.h"
 #include "llviewerwindow.h"
 #include "llvoiceclient.h"
 #include "llvrlanguage.h"
@@ -67,6 +68,75 @@ LLViewerVR gVR;
 
 namespace
 {
+    // A controller's model, made from Meta's controller art by
+    // scripts/slvr/convert_controller_models.py into the user settings folder (the models are
+    // Meta's and not part of SLVR). Metres in the frame of the aim pose (x right, y up, -z
+    // along the laser), triangles counter-clockwise seen from outside. Without one, a box.
+    struct ControllerModel
+    {
+        std::vector<LLVector3> positions, normals;
+        std::vector<LLVector2> uvs;
+        std::vector<U32> indices;
+        LLPointer<LLViewerTexture> texture; // grey without it
+    };
+    // By the physical hand, right and left; loaded on first use, freed as VR shuts down (not
+    // at exit, when GL is gone). nullptr until tried; empty when there is none.
+    ControllerModel* sControllerModels[2] = { nullptr, nullptr };
+    const char* const CONTROLLER_SIDES[2] = { "right", "left" };
+
+    ControllerModel* loadControllerModel(S32 side)
+    {
+        ControllerModel* model = new ControllerModel;
+        const std::string name = CONTROLLER_SIDES[side];
+        const std::string path = gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, "vr_controllers", name + ".mesh");
+        llifstream file(path.c_str());
+        if (!file.is_open())
+        {
+            LL_INFOS("VR") << "No controller model " << path << ", drawing boxes" << LL_ENDL;
+            return model;
+        }
+        std::string magic, word;
+        S32 version = 0, vertex_count = 0, triangle_count = 0;
+        bool ok = (file >> magic >> version >> word >> vertex_count) && magic == "slvr_controller" && version == 1
+                  && word == "vertices" && vertex_count > 0 && vertex_count < 200000;
+        for (S32 i = 0; ok && i < vertex_count; ++i)
+        {
+            LLVector3 position, normal;
+            LLVector2 uv;
+            ok = (bool)(file >> position.mV[VX] >> position.mV[VY] >> position.mV[VZ] >> normal.mV[VX] >> normal.mV[VY]
+                             >> normal.mV[VZ] >> uv.mV[VX] >> uv.mV[VY]);
+            model->positions.push_back(position);
+            model->normals.push_back(normal);
+            model->uvs.push_back(uv);
+        }
+        ok = ok && (file >> word >> triangle_count) && word == "triangles" && triangle_count > 0 && triangle_count < 400000;
+        for (S32 i = 0; ok && i < 3 * triangle_count; ++i)
+        {
+            U32 index = 0;
+            ok = (file >> index) && index < (U32)vertex_count;
+            model->indices.push_back(index);
+        }
+        if (!ok)
+        {
+            LL_WARNS("VR") << "Controller model " << path << " is damaged; convert it again. Drawing boxes" << LL_ENDL;
+            *model = ControllerModel();
+            return model;
+        }
+        LLPointer<LLImagePNG> png = new LLImagePNG;
+        LLPointer<LLImageRaw> raw = new LLImageRaw;
+        if (png->load(gDirUtilp->getExpandedFilename(LL_PATH_USER_SETTINGS, "vr_controllers", name + ".png")) && png->decode(raw, 0.f))
+        {
+            if (raw->getWidth() > 1024 || raw->getHeight() > 1024)
+            {
+                raw->scale(llmin(raw->getWidth(), 1024), llmin(raw->getHeight(), 1024));
+            }
+            model->texture = LLViewerTextureManager::getLocalTexture(raw.get(), true);
+        }
+        LL_INFOS("VR") << "Controller model " << name << ": " << vertex_count << " vertices, " << triangle_count
+                       << " triangles, " << (model->texture ? "textured" : "no texture") << LL_ENDL;
+        return model;
+    }
+
     // Rotates a vector by a quaternion (x, y, z, w).
     void rotate(const float q[4], const float v[3], float out[3])
     {
@@ -411,6 +481,11 @@ void LLViewerVR::shutdown()
     mLaserValid = mPanelHit = mWorldHit = mFirstPerson = mLeftLaserValid = mLeftPanelHit = false;
     mSteady.valid = mLeftSteady.valid = mMotionValid = false;
     mVignette = mBlink = 0.f;
+    for (ControllerModel*& model : sControllerModels)
+    {
+        delete model; // its texture with it, while GL is still there
+        model = nullptr;
+    }
     mKeyboardShown = mWristShown = mArcAiming = mArcValid = mOwnZoom = mPanelFollowing = false;
     mArc.clear();
     applyGraphics(false);
@@ -1339,18 +1414,23 @@ void LLViewerVR::drawArc()
     gUIProgram.unbind();
 }
 
-// Where the hands are: a small box for each controller, behind where its laser leaves it.
+// Where the hands are: each controller's model (see ControllerModel), or a small box behind
+// where its laser leaves it.
 void LLViewerVR::drawControllers()
 {
     const F32 HALF[3] = { 0.018f, 0.015f, 0.055f }; // metres along the controller's right, up and forward
     const float RIGHT[3] = { 1.f, 0.f, 0.f }, UP[3] = { 0.f, 1.f, 0.f }, FORWARD[3] = { 0.f, 0.f, -1.f };
+    static LLCachedControl<bool> left_handed(gSavedSettings, "SLVRLeftHanded", false);
     gViewerWindow->setup3DRender();
     LLGLSUIDefault gls_ui;
-    LLGLEnable cull(GL_CULL_FACE); // a box is convex: its faces turned to the eye alone draw it right, without depth
+    LLGLEnable cull(GL_CULL_FACE); // closed shapes: the faces turned to the eye alone draw them
+    // A model is not convex: it needs depth for itself. The scene's depth is not in this
+    // image, so start from empty depth; nothing drawn after the controllers uses it.
+    LLGLDepthTest depth(GL_TRUE, GL_TRUE, GL_LEQUAL);
+    glClear(GL_DEPTH_BUFFER_BIT);
     gGL.setSceneBlendType(LLRender::BT_ALPHA);
+    gGL.matrixMode(LLRender::MM_MODELVIEW);
     gUIProgram.bind();
-    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
-    gGL.begin(LLRender::TRIANGLES);
     for (S32 hand = 0; hand < 2; ++hand)
     {
         if (!(hand ? mInput.left_aim_valid : mInput.aim_valid))
@@ -1363,7 +1443,52 @@ void LLViewerVR::drawControllers()
         rotate(rot, UP, u);
         rotate(rot, FORWARD, f);
         const LLVector3 axes[3] = { toAgent(trackingToLocal(r)), toAgent(trackingToLocal(u)), toAgent(trackingToLocal(f)) };
-        const LLVector3 centre = mBaseOrigin + toAgent(trackingToLocal(hand ? mInput.left_aim_pos : mInput.aim_pos)) - axes[2] * 0.06f;
+        const LLVector3 origin = mBaseOrigin + toAgent(trackingToLocal(hand ? mInput.left_aim_pos : mInput.aim_pos));
+
+        const S32 side = left_handed ? 1 - hand : hand; // the physical controller: hands are swapped in input
+        if (!sControllerModels[side])
+        {
+            sControllerModels[side] = loadControllerModel(side);
+        }
+        const ControllerModel& model = *sControllerModels[side];
+        if (!model.indices.empty())
+        {
+            // Model space is the aim pose's: x right, y up, z back (against the laser).
+            const LLVector3 back = -axes[2];
+            const GLfloat matrix[16] = { axes[0].mV[VX], axes[0].mV[VY], axes[0].mV[VZ], 0.f,
+                                         axes[1].mV[VX], axes[1].mV[VY], axes[1].mV[VZ], 0.f,
+                                         back.mV[VX], back.mV[VY], back.mV[VZ], 0.f,
+                                         origin.mV[VX], origin.mV[VY], origin.mV[VZ], 1.f };
+            gGL.pushMatrix();
+            gGL.multMatrix(matrix);
+            if (model.texture)
+            {
+                gGL.getTexUnit(0)->bind(model.texture);
+            }
+            else
+            {
+                gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+            }
+            // shortcut: immediate mode, some 17000 vertices a hand an eye; a vertex buffer if it costs frames.
+            gGL.begin(LLRender::TRIANGLES);
+            for (U32 index : model.indices)
+            {
+                // Lit from above: the normal's height in the world.
+                const LLVector3& n = model.normals[index];
+                const F32 up = n.mV[VX] * axes[0].mV[VZ] + n.mV[VY] * axes[1].mV[VZ] + n.mV[VZ] * back.mV[VZ];
+                const F32 shade = model.texture ? 0.6f + 0.4f * llmax(up, 0.f) : 0.3f + 0.3f * llmax(up, 0.f);
+                gGL.color4f(shade, shade, shade, 1.f);
+                gGL.texCoord2fv(model.uvs[index].mV);
+                gGL.vertex3fv(model.positions[index].mV);
+            }
+            gGL.end();
+            gGL.popMatrix();
+            continue;
+        }
+
+        gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
+        gGL.begin(LLRender::TRIANGLES);
+        const LLVector3 centre = origin - axes[2] * 0.06f;
         for (S32 axis = 0; axis < 3; ++axis)
         {
             for (F32 sign : { -1.f, 1.f })
@@ -1381,9 +1506,10 @@ void LLViewerVR::drawControllers()
                 }
             }
         }
+        gGL.end();
     }
-    gGL.end();
     gGL.flush();
+    gGL.getTexUnit(0)->unbind(LLTexUnit::TT_TEXTURE);
     gUIProgram.unbind();
 }
 
