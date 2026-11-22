@@ -1,3 +1,5 @@
+<p align="center"><img src="doc/slvr/cover.jpg" alt="SLVR: Second Life in virtual reality" width="100%"></p>
+
 # SLVR
 
 **Second Life in virtual reality.** SLVR is a Second Life viewer with native OpenXR support,
