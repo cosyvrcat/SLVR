@@ -211,31 +211,21 @@ namespace
     // level, square on to the eyes, so it leans back like a laptop's keyboard.
     const F32 KEYBOARD_BELOW = 40.f * DEG_TO_RAD;
 
-    // What a press at a point of the UI (window pixels) lands on: a field that takes text, a
-    // window's title bar, or something else.
+    // What a press just sent to the UI landed on, told by what took the mouse: a field that
+    // takes text, a window's title bar, or something else. Not by the views at the point:
+    // there, full-window views that let the mouse through are in front of the windows, and
+    // no press was ever found on a text field or a title bar (v0.6.2: no keyboard at all).
     enum class Pressed { TEXT, TITLE, OTHER };
-    Pressed pressedAt(S32 x, S32 y, LLView** title = nullptr)
+    Pressed pressedOn(LLView** title)
     {
-        const LLVector2 scale = gViewerWindow->getDisplayScale();
-        LLView* root = gViewerWindow->getRootView();
-        for (LLView* view = root->childFromPoint(ll_round(x / scale.mV[VX]), ll_round(y / scale.mV[VY]), true);
-             view && view != root; view = view->getParent())
+        LLMouseHandler* captor = gFocusMgr.getMouseCapture();
+        if (LLDragHandle* handle = dynamic_cast<LLDragHandle*>(captor))
         {
-            const LLUICtrl* ctrl = dynamic_cast<LLUICtrl*>(view);
-            if (ctrl && ctrl->acceptsTextInput())
-            {
-                return Pressed::TEXT;
-            }
-            if (dynamic_cast<LLDragHandle*>(view))
-            {
-                if (title)
-                {
-                    *title = view;
-                }
-                return Pressed::TITLE;
-            }
+            *title = handle;
+            return Pressed::TITLE;
         }
-        return Pressed::OTHER;
+        const LLUICtrl* ctrl = dynamic_cast<LLUICtrl*>(captor);
+        return ctrl && ctrl->acceptsTextInput() ? Pressed::TEXT : Pressed::OTHER;
     }
 
     // While the left grip holds the panel, the right stick moves it along the laser and
@@ -275,10 +265,11 @@ namespace
     const F32 PRESS_STRENGTH = 0.35f, PRESS_TIME = 0.025f; // and as one is pressed
     const F32 EYES_BELOW_TOP = 0.11f; // metres from the eyes to the top of the head: height = eye height + this
     // Teleport arc: thrown from the hand along the laser, falling like a ball, in steps.
-    // Some 22 metres on level ground: many places send a short teleport to their landing point.
-    const F32 ARC_SPEED = 14.1f, ARC_GRAVITY = 9.8f; // m/s, m/s^2
+    // Some 27 metres on level ground (2.5 times the first arc's): many places send a short
+    // teleport to their landing point.
+    const F32 ARC_SPEED = 15.8f, ARC_GRAVITY = 9.8f; // m/s, m/s^2
     const F32 ARC_STEP = 0.05f;   // seconds of flight per step
-    const S32 ARC_STEPS = 70;
+    const S32 ARC_STEPS = 80;
     const F32 ARC_FLAT = 0.7f;    // a surface is stood on when its normal is this close to straight up
     const F32 ARC_RING = 0.35f;   // metres, the landing ring
     // Wrist menu: an image of 2 x 3 buttons over the other hand, while its face is turned to the eyes.
@@ -295,7 +286,7 @@ namespace
         return LLRect(col * w + 8, WRIST_HEIGHT - row * h - 8, (col + 1) * w - 8, WRIST_HEIGHT - (row + 1) * h + 8);
     }
     // SLVRPanelFollow: the panel glides back once the eyes are this far off it, until it is this near.
-    const F32 PANEL_FOLLOW_AWAY = 50.f * DEG_TO_RAD, PANEL_FOLLOW_NEAR = 3.f * DEG_TO_RAD;
+    const F32 PANEL_FOLLOW_AWAY = 35.f * DEG_TO_RAD, PANEL_FOLLOW_NEAR = 3.f * DEG_TO_RAD;
     const F32 PANEL_FOLLOW_RATE = 1.f; // Hz
 
     F32 snapTurn()
@@ -1771,12 +1762,14 @@ void LLViewerVR::pressWrist()
     switch (mWristItem)
     {
     case 0: // the whole panel, or none
-        mPanelVisible = mChatOnly ? true : !mPanelVisible;
-        mChatOnly = false;
-        if (mPanelVisible)
+        // From the chat alone the panel stays where it is, as it does the other way (the menu
+        // button): placed anew, the conversation window jumped aside to its spot on the panel.
+        if (!mPanelVisible)
         {
             placePanel(nullptr);
         }
+        mPanelVisible = mChatOnly ? true : !mPanelVisible;
+        mChatOnly = false;
         break;
     case 1: // the chat alone, or none
         if (mPanelVisible && mChatOnly)
@@ -1791,7 +1784,18 @@ void LLViewerVR::pressWrist()
         }
         break;
     case 2:
-        showSettings();
+        if (mPanelVisible && !mChatOnly)
+        {
+            showSettings();
+        }
+        else if (LLFloater* settings = LLFloaterReg::showInstance("slvr_settings", LLSD(), true))
+        {
+            // Alone, over what is shown, as a window opened from a menu is (see updatePopped()).
+            if (!isPopped(settings))
+            {
+                mPopped.push_back(settings->getHandle());
+            }
+        }
         placePanel(LLFloaterReg::findInstance("slvr_settings"));
         break;
     case 3:
@@ -2918,19 +2922,6 @@ void LLViewerVR::applyInput()
             {
                 gMenuHolder->hideMenus();
             }
-            if (on_panel)
-            {
-                LLView* title = nullptr;
-                const Pressed pressed = pressedAt(mPointerX, mPointerY, &title);
-                if (pressed != Pressed::TITLE) // dragging a window leaves the keyboard as it is
-                {
-                    mKeyboardWanted = pressed == Pressed::TEXT;
-                }
-                if (pressed == Pressed::TITLE && (mChatOnly || !mPanelVisible))
-                {
-                    startTitleDrag(title);
-                }
-            }
         }
         if (!mTriggerOnKeyboard && !mTriggerOnWrist)
         {
@@ -2980,6 +2971,19 @@ void LLViewerVR::applyInput()
             mClickX = mPointerX;
             mClickY = mPointerY;
             gViewerWindow->handleMouseDown(window, pointer, mask);
+        }
+        if (input.trigger && mTriggerOnPanel && !mTriggerOnWrist && !mTriggerOnKeyboard && !mTriggerClosedMenu)
+        {
+            LLView* title = nullptr;
+            const Pressed pressed = pressedOn(&title);
+            if (pressed != Pressed::TITLE) // dragging a window leaves the keyboard as it is
+            {
+                mKeyboardWanted = pressed == Pressed::TEXT;
+            }
+            if (pressed == Pressed::TITLE && (mChatOnly || !mPanelVisible) && startTitleDrag(title))
+            {
+                gFocusMgr.setMouseCapture(nullptr); // the panel goes round the eyes, not the window across it
+            }
         }
     }
     if (input.grip != mGripDown)

@@ -53,7 +53,7 @@ This repository holds **source code only**. No builds are published here.
 - **Turning** with the right stick, in steps of 15°, 30°, 45° or 90°, or smoothly at an
   adjustable speed.
 - **Flying.** Hold the right stick up to take off; push up or down to rise or sink.
-- **Arc teleport.** Hold A to aim a falling arc, reaching some 20 metres, and release to go
+- **Arc teleport.** Hold A to aim a falling arc, reaching some 27 metres, and release to go
   there. The arc refuses walls, steep surfaces and places where RLVa does not allow you to go.
 - **Recentre.** Hold X to make the way you face now straight ahead.
 
@@ -182,6 +182,7 @@ the headset before the next one builds on it.
 
 | Version | What it added |
 | --- | --- |
+| 0.6.4 | Keyboard comes up on text fields again, windows carried round you by their title bar, panel follows sooner, longer teleport, settings alone from the wrist menu |
 | 0.6.3 | Swipe typing on the keyboard; pie menu slices take the laser to their edge |
 | 0.6.2 | Keyboard only on text fields and at the waist, chat window stays put and moves in space, steadier vignette, menus where you look, longer teleport, clearer running, instant lighter-graphics switch |
 | 0.6.1 | Meta Quest Touch Plus controller models, with an option to hide the controllers |
