@@ -22,6 +22,7 @@
       <key>language_label</key><string>SLVR language:</string>
       <key>keyboard_label</key><string>Keyboard layout:</string>
       <key>word_suggestions</key><string>Word suggestions and next-word prediction</string>
+      <key>swipe_typing</key><string>Swipe typing (glide over the letters)</string>
       <key>message_dot_private</key><string>Message dot only for private chats</string>
       <key>smooth_turn</key><string>Smooth turning (off: in steps)</string>
       <key>vignette_label</key><string>Comfort vignette:</string>
@@ -90,6 +91,7 @@
       <key>language_label</key><string>SLVR dili:</string>
       <key>keyboard_label</key><string>Klavye düzeni:</string>
       <key>word_suggestions</key><string>Kelime önerileri ve sonraki kelime tahmini</string>
+      <key>swipe_typing</key><string>Kaydırarak yazma (harflerin üzerinden kaydır)</string>
       <key>message_dot_private</key><string>Mesaj noktası yalnızca özel sohbetler için</string>
       <key>smooth_turn</key><string>Kesintisiz dönüş (kapalıyken adım adım)</string>
       <key>vignette_label</key><string>Konfor vinyeti:</string>
@@ -158,6 +160,7 @@
       <key>language_label</key><string>SLVR dili:</string>
       <key>keyboard_label</key><string>Klaviatura düzümü:</string>
       <key>word_suggestions</key><string>Söz təklifləri və növbəti söz proqnozu</string>
+      <key>swipe_typing</key><string>Sürüşdürərək yazma (hərflərin üzərindən sürüşdür)</string>
       <key>message_dot_private</key><string>Mesaj nöqtəsi yalnız şəxsi söhbətlər üçün</string>
       <key>smooth_turn</key><string>Hamar dönmə (söndürülü: addımlarla)</string>
       <key>vignette_label</key><string>Rahatlıq vinyeti:</string>
@@ -226,6 +229,7 @@
       <key>language_label</key><string>SLVR-sprog:</string>
       <key>keyboard_label</key><string>Tastaturlayout:</string>
       <key>word_suggestions</key><string>Ordforslag og forudsigelse af næste ord</string>
+      <key>swipe_typing</key><string>Swipe-skrivning (glid hen over bogstaverne)</string>
       <key>message_dot_private</key><string>Beskedprik kun for private samtaler</string>
       <key>smooth_turn</key><string>Glidende drejning (fra: i trin)</string>
       <key>vignette_label</key><string>Komfortvignet:</string>
@@ -294,6 +298,7 @@
       <key>language_label</key><string>SLVR-Sprache:</string>
       <key>keyboard_label</key><string>Tastaturlayout:</string>
       <key>word_suggestions</key><string>Wortvorschläge und Vorhersage des nächsten Worts</string>
+      <key>swipe_typing</key><string>Wischtippen (über die Buchstaben gleiten)</string>
       <key>message_dot_private</key><string>Nachrichtenpunkt nur für private Chats</string>
       <key>smooth_turn</key><string>Stufenloses Drehen (aus: in Stufen)</string>
       <key>vignette_label</key><string>Komfort-Vignette:</string>
@@ -362,6 +367,7 @@
       <key>language_label</key><string>Idioma de SLVR:</string>
       <key>keyboard_label</key><string>Distribución del teclado:</string>
       <key>word_suggestions</key><string>Sugerencias de palabras y predicción de la siguiente</string>
+      <key>swipe_typing</key><string>Escritura deslizando (desliza sobre las letras)</string>
       <key>message_dot_private</key><string>Punto de mensaje solo para chats privados</string>
       <key>smooth_turn</key><string>Giro suave (desactivado: por pasos)</string>
       <key>vignette_label</key><string>Viñeta de confort:</string>
@@ -430,6 +436,7 @@
       <key>language_label</key><string>Langue de SLVR :</string>
       <key>keyboard_label</key><string>Disposition du clavier :</string>
       <key>word_suggestions</key><string>Suggestions de mots et prédiction du mot suivant</string>
+      <key>swipe_typing</key><string>Saisie par glissement (glisser sur les lettres)</string>
       <key>message_dot_private</key><string>Point de message uniquement pour les discussions privées</string>
       <key>smooth_turn</key><string>Rotation fluide (désactivée : par crans)</string>
       <key>vignette_label</key><string>Vignette de confort :</string>
@@ -498,6 +505,7 @@
       <key>language_label</key><string>Lingua di SLVR:</string>
       <key>keyboard_label</key><string>Layout tastiera:</string>
       <key>word_suggestions</key><string>Suggerimenti di parole e previsione della successiva</string>
+      <key>swipe_typing</key><string>Scrittura a scorrimento (scorri sulle lettere)</string>
       <key>message_dot_private</key><string>Punto messaggi solo per le chat private</string>
       <key>smooth_turn</key><string>Rotazione fluida (disattivata: a scatti)</string>
       <key>vignette_label</key><string>Vignettatura di comfort:</string>
@@ -566,6 +574,7 @@
       <key>language_label</key><string>Język SLVR:</string>
       <key>keyboard_label</key><string>Układ klawiatury:</string>
       <key>word_suggestions</key><string>Podpowiedzi słów i przewidywanie następnego słowa</string>
+      <key>swipe_typing</key><string>Pisanie przesunięciem (przesuń po literach)</string>
       <key>message_dot_private</key><string>Kropka wiadomości tylko dla prywatnych rozmów</string>
       <key>smooth_turn</key><string>Płynny obrót (wył.: skokowo)</string>
       <key>vignette_label</key><string>Winieta komfortu:</string>
@@ -634,6 +643,7 @@
       <key>language_label</key><string>Idioma do SLVR:</string>
       <key>keyboard_label</key><string>Layout do teclado:</string>
       <key>word_suggestions</key><string>Sugestões de palavras e previsão da próxima</string>
+      <key>swipe_typing</key><string>Digitação deslizante (deslize sobre as letras)</string>
       <key>message_dot_private</key><string>Ponto de mensagem só para conversas privadas</string>
       <key>smooth_turn</key><string>Rotação suave (desligada: por passos)</string>
       <key>vignette_label</key><string>Vinheta de conforto:</string>
@@ -702,6 +712,7 @@
       <key>language_label</key><string>Язык SLVR:</string>
       <key>keyboard_label</key><string>Раскладка клавиатуры:</string>
       <key>word_suggestions</key><string>Подсказки слов и предсказание следующего слова</string>
+      <key>swipe_typing</key><string>Ввод свайпом (ведите по буквам)</string>
       <key>message_dot_private</key><string>Точка сообщений только для личных чатов</string>
       <key>smooth_turn</key><string>Плавный поворот (выкл.: шагами)</string>
       <key>vignette_label</key><string>Виньетка комфорта:</string>
@@ -764,6 +775,7 @@
       <key>language_label</key><string>SLVRの言語:</string>
       <key>keyboard_label</key><string>キーボード配列:</string>
       <key>word_suggestions</key><string>単語の候補と次の単語の予測</string>
+      <key>swipe_typing</key><string>スワイプ入力（文字の上をなぞる）</string>
       <key>message_dot_private</key><string>メッセージの点は個人チャットのみ</string>
       <key>smooth_turn</key><string>スムーズ回転（オフ：段階回転）</string>
       <key>vignette_label</key><string>快適ビネット:</string>
@@ -826,6 +838,7 @@
       <key>language_label</key><string>SLVR语言:</string>
       <key>keyboard_label</key><string>键盘布局:</string>
       <key>word_suggestions</key><string>单词建议与下一个词预测</string>
+      <key>swipe_typing</key><string>滑行输入（在字母上滑动）</string>
       <key>message_dot_private</key><string>消息提示点仅用于私聊</string>
       <key>smooth_turn</key><string>平滑转向（关闭：分段转向）</string>
       <key>vignette_label</key><string>舒适晕影:</string>

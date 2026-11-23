@@ -14,6 +14,7 @@
 #include "lldir.h"
 #include "llfocusmgr.h"
 #include "llfontgl.h"
+#include "llframetimer.h"
 #include "llkeyboard.h"
 #include "lllineeditor.h"
 #include "llrender.h"
@@ -463,6 +464,51 @@ namespace
         }
     }
 
+    // Swipe typing: a word's path is the line through its letters' keys; the one the laser
+    // drew is compared with each word's at SWIPE_SAMPLES points spread evenly along both.
+    // A word is kept when they lie within SWIPE_MOST_APART keys of each other on average.
+    const S32 SWIPE_SAMPLES = 32;
+    const F32 SWIPE_MOST_APART = 1.2f;  // keys
+    const F32 SWIPE_SHAPE_WEIGHT = 12.f; // against the log of how often a word was seen
+    const F32 SWIPE_POINT_STEP = 4.f;   // pixels the laser moves before a new point is kept
+    const F32 TRAIL_LIFE = 0.45f;       // seconds a point of the trail takes to fade
+
+    // Spreads a path's length evenly over n points.
+    std::vector<LLVector2> resample(const std::vector<LLVector2>& path, S32 n)
+    {
+        std::vector<LLVector2> out;
+        if (path.empty())
+        {
+            return out;
+        }
+        F32 total = 0.f;
+        for (size_t i = 1; i < path.size(); ++i)
+        {
+            total += dist_vec(path[i - 1], path[i]);
+        }
+        if (total <= 0.f)
+        {
+            return std::vector<LLVector2>(n, path[0]);
+        }
+        const F32 step = total / (n - 1);
+        out.push_back(path[0]);
+        F32 along = 0.f; // length of the path before point i - 1
+        size_t i = 1;
+        for (S32 k = 1; k < n - 1; ++k)
+        {
+            const F32 target = step * k;
+            while (i < path.size() - 1 && along + dist_vec(path[i - 1], path[i]) < target)
+            {
+                along += dist_vec(path[i - 1], path[i]);
+                ++i;
+            }
+            const F32 segment = dist_vec(path[i - 1], path[i]);
+            out.push_back(lerp(path[i - 1], path[i], segment > 0.f ? llclamp((target - along) / segment, 0.f, 1.f) : 0.f));
+        }
+        out.push_back(path.back());
+        return out;
+    }
+
     void label(const LLWString& text, F32 cx, F32 cy, const LLColor4& color)
     {
         if (const LLFontGL* font = LLFontGL::getFontSansSerifHuge())
@@ -509,7 +555,7 @@ LLVRKeyboard::Hit LLVRKeyboard::hitAt(S32 px, S32 py) const
     return hit;
 }
 
-void LLVRKeyboard::draw(const Hit hover[2]) const
+void LLVRKeyboard::draw(const Hit hover[2], const LLColor4& trail) const
 {
     auto hovered = [&](const Hit& hit) { return hover[0] == hit || hover[1] == hit; };
     const LLColor4 text_color(0.93f, 0.94f, 0.96f, 1.f);
@@ -575,22 +621,212 @@ void LLVRKeyboard::draw(const Hit hover[2]) const
     const bool handle_hover = hovered({ HANDLE, -1 });
     roundedRect(LLRectf(WIDTH / 2.f - HANDLE_HALF, HANDLE_TOP, WIDTH / 2.f + HANDLE_HALF, HANDLE_BOTTOM), 11.f,
                 handle_hover ? LLColor4(0.95f, 0.95f, 0.97f, 0.95f) : LLColor4(0.75f, 0.77f, 0.8f, 0.8f));
+
+    // The swipe trail, over the keys: each stretch thins and fades as it ages, so the trail
+    // grows at the laser and dies away from where it began.
+    const F64 now = LLFrameTimer::getElapsedSeconds();
+    for (size_t i = 1; i < mTrail.size(); ++i)
+    {
+        const F32 life = 1.f - (F32)(now - mTrail[i - 1].time) / TRAIL_LIFE;
+        if (life > 0.f)
+        {
+            LLColor4 colour = trail;
+            colour.mV[VALPHA] *= life;
+            stroke({ mTrail[i - 1].pos, mTrail[i].pos }, 4.f + 12.f * life, colour);
+        }
+    }
+}
+
+bool LLVRKeyboard::swipeStart(const Hit& hit, S32 x, S32 y)
+{
+    static LLCachedControl<bool> swipe(gSavedSettings, "SLVRSwipeTyping", true);
+    const std::vector<KeyBox>& boxes = keyBoxes(mPage);
+    if (!swipe || mPage != 0 || hit.part != KEY || hit.index < 0 || hit.index >= (S32)boxes.size())
+    {
+        return false;
+    }
+    const KeyDef& key = boxes[hit.index].def;
+    const LLWString text = utf8str_to_wstring(key.text);
+    if (key.action != TEXT || text.size() != 1 || !isLetter(text[0]))
+    {
+        return false;
+    }
+    mSwiping = true;
+    mSwipeKey = hit;
+    mSwipeLeftKey = false;
+    mSwipePath.assign(1, LLVector2((F32)x, (F32)y));
+    mTrail.assign(1, { mSwipePath[0], LLFrameTimer::getElapsedSeconds() });
+    return true;
+}
+
+void LLVRKeyboard::swipeMove(S32 x, S32 y)
+{
+    const LLVector2 point((F32)x, (F32)y);
+    if (!mSwiping || dist_vec(point, mSwipePath.back()) < SWIPE_POINT_STEP)
+    {
+        return;
+    }
+    mSwipePath.push_back(point);
+    mTrail.push_back({ point, LLFrameTimer::getElapsedSeconds() });
+    mSwipeLeftKey = mSwipeLeftKey || !(hitAt(x, y) == mSwipeKey);
+}
+
+void LLVRKeyboard::swipeEnd()
+{
+    if (!mSwiping)
+    {
+        return;
+    }
+    mSwiping = false;
+    if (!mSwipeLeftKey) // a tap: the letter alone
+    {
+        mTrail.clear();
+        press(mSwipeKey);
+        return;
+    }
+    LLWString words[3];
+    const S32 found = swipeWords(mSwipePath, words);
+    if (found == 0)
+    {
+        return; // no known word goes that way; the trail fades
+    }
+    // In the case shift asks for, as the suggestions are.
+    for (LLWString& word : words)
+    {
+        for (size_t c = 0; c < word.size(); ++c)
+        {
+            if (mCapsLock || (mShift && c == 0))
+            {
+                word[c] = upper(word[c]);
+            }
+        }
+    }
+    // A space before it when it would run into the word before the cursor.
+    LLWString text;
+    S32 cursor = 0;
+    const bool after_word = focusedText(text, cursor) && cursor > 0 && cursor <= (S32)text.size() && isLetter(text[cursor - 1]);
+    if (after_word)
+    {
+        type(LLWString(1, ' '));
+    }
+    mSwiped = words[0] + LLWString(1, ' ');
+    type(mSwiped);
+    mSwipeOthers[0] = words[1];
+    mSwipeOthers[1] = words[2];
+    const std::string key = wordKey(words[0]);
+    mTyped.words[key] += 1;
+    if (!mPrevious.empty() && !after_word)
+    {
+        mTyped.pairs[mPrevious + ' ' + key] += 1;
+    }
+    mShift = mCapsLock;
+}
+
+S32 LLVRKeyboard::swipeWords(const std::vector<LLVector2>& path, LLWString out[3]) const
+{
+    // Where each letter of the layout is.
+    std::map<llwchar, LLVector2> centres;
+    for (const KeyBox& box : keyBoxes(0))
+    {
+        const LLWString text = utf8str_to_wstring(box.def.text);
+        if (box.def.action == TEXT && text.size() == 1 && isLetter(text[0]))
+        {
+            centres[lower(text[0])] = LLVector2(box.rect.getCenterX(), box.rect.getCenterY());
+        }
+    }
+    if (path.size() < 2)
+    {
+        return 0;
+    }
+    const std::vector<LLVector2> drawn = resample(path, SWIPE_SAMPLES);
+
+    // How often each word was seen, raised when it followed the previous word (as the
+    // suggestions count).
+    std::map<std::string, F32> seen;
+    for (const Learned* learned : { &mLog, &mTyped })
+    {
+        const U32 weight = learned == &mTyped ? TYPED_WEIGHT : 1;
+        for (const auto& word : learned->words)
+        {
+            seen[word.first] += (F32)(word.second * weight);
+        }
+        if (!mPrevious.empty())
+        {
+            const std::string prefix = mPrevious + ' ';
+            withPrefix(learned->pairs, prefix, [&](const std::string& key, U32 count)
+                       { seen[key.substr(prefix.size())] += (F32)(count * weight * PAIR_WEIGHT); });
+        }
+    }
+
+    std::vector<std::pair<F32, LLWString>> ranked;
+    for (const auto& entry : seen)
+    {
+        const LLWString word = utf8str_to_wstring(entry.first);
+        if (word.size() < 2)
+        {
+            continue;
+        }
+        std::vector<LLVector2> keys;
+        bool known = true;
+        for (llwchar c : word)
+        {
+            const auto it = centres.find(c);
+            known = known && it != centres.end();
+            if (!known)
+            {
+                break;
+            }
+            if (keys.empty() || keys.back() != it->second) // a doubled letter is one key
+            {
+                keys.push_back(it->second);
+            }
+        }
+        // It begins on the key pressed and ends near where the laser let go.
+        if (!known || dist_vec(keys.front(), path.front()) > UNIT * 0.75f || dist_vec(keys.back(), path.back()) > UNIT * 1.5f)
+        {
+            continue;
+        }
+        const std::vector<LLVector2> ideal = resample(keys, SWIPE_SAMPLES);
+        F32 apart = 0.f;
+        for (S32 i = 0; i < SWIPE_SAMPLES; ++i)
+        {
+            apart += dist_vec(drawn[i], ideal[i]);
+        }
+        apart /= SWIPE_SAMPLES * UNIT;
+        if (apart < SWIPE_MOST_APART)
+        {
+            ranked.emplace_back(logf(1.f + entry.second) - SWIPE_SHAPE_WEIGHT * apart * apart, word);
+        }
+    }
+    const size_t count = llmin(ranked.size(), (size_t)3);
+    std::partial_sort(ranked.begin(), ranked.begin() + count, ranked.end(),
+                      [](const auto& a, const auto& b) { return a.first > b.first; });
+    for (size_t i = 0; i < count; ++i)
+    {
+        out[i] = ranked[i].second;
+    }
+    return (S32)count;
 }
 
 LLVRKeyboard::EPress LLVRKeyboard::press(const Hit& hit)
 {
     if (hit.part == SUGGESTION && hit.index >= 0 && hit.index < 3 && !mSuggestions[hit.index].empty())
     {
-        // Replace the word being typed by the suggestion, as typed keys would.
+        // Replace the word being typed by the suggestion, as typed keys would; just after a
+        // swipe, the word it typed (see update()).
         const LLWString word = mSuggestions[hit.index];
-        for (size_t i = 0; i < mWord.size(); ++i)
+        const bool swiped = !mSwiped.empty(); // the word before the cursor is then the one replaced
+        const size_t typed = swiped ? mSwiped.size() : mWord.size();
+        mSwiped.clear();
+        mContext.clear();
+        for (size_t i = 0; i < typed; ++i)
         {
             gViewerWindow->handleKey(KEY_BACKSPACE, MASK_NONE);
         }
         type(word + LLWString(1, ' '));
         const std::string key = wordKey(word);
         mTyped.words[key] += 1;
-        if (!mPrevious.empty())
+        if (!mPrevious.empty() && !swiped)
         {
             mTyped.pairs[mPrevious + ' ' + key] += 1;
         }
@@ -678,13 +914,16 @@ void LLVRKeyboard::learnText(const LLWString& text, U32 weight)
 void LLVRKeyboard::reset()
 {
     mPage = 0;
-    mShift = mCapsLock = false;
+    mShift = mCapsLock = mSwiping = false;
+    mTrail.clear();
+    mSwiped.clear();
 }
 
 void LLVRKeyboard::update()
 {
     static LLCachedControl<bool> suggest(gSavedSettings, "SLVRWordSuggestions", true);
-    if (suggest && !mLoadStarted)
+    static LLCachedControl<bool> swipe(gSavedSettings, "SLVRSwipeTyping", true);
+    if ((suggest || swipe) && !mLoadStarted) // swipe typing finds its words there too
     {
         const std::string dir = gDirUtilp->getPerAccountChatLogsDir();
         if (!dir.empty()) // empty until logged in
@@ -733,6 +972,25 @@ void LLVRKeyboard::update()
     {
         mContext = context;
         refreshSuggestions();
+    }
+
+    // Just after a swipe, while the word it typed is still just before the cursor, the other
+    // words it may have meant are offered in its place.
+    if (!mSwiped.empty())
+    {
+        const S32 length = (S32)mSwiped.size();
+        if (focusedText(text, cursor) && cursor >= length && cursor <= (S32)text.size()
+            && text.compare(cursor - length, length, mSwiped) == 0)
+        {
+            mSuggestions[0] = mSwipeOthers[0];
+            mSuggestions[1] = mSwipeOthers[1];
+            mSuggestions[2].clear();
+        }
+        else
+        {
+            mSwiped.clear();
+            mContext.clear(); // the usual suggestions come back
+        }
     }
 }
 
@@ -860,4 +1118,39 @@ void LLVRKeyboard::selfCheck()
     keyboard.refreshSuggestions();
     llassert_always(wstring_to_utf8str(keyboard.mSuggestions[0]) == nasilsin && wstring_to_utf8str(keyboard.mSuggestions[1]) == "naber"
                     && wstring_to_utf8str(keyboard.mSuggestions[2]) == "nasa");
+
+    // Swipe typing. A path's length spreads evenly over its points.
+    const std::vector<LLVector2> even = resample({ LLVector2(0.f, 0.f), LLVector2(2.f, 0.f), LLVector2(10.f, 0.f) }, 3);
+    llassert_always(even.size() == 3 && dist_vec(even[1], LLVector2(5.f, 0.f)) < 1e-4f && dist_vec(even[2], LLVector2(10.f, 0.f)) < 1e-4f);
+    // On this layout: the top row's first and last letters, and the bottom row's first. A
+    // path down to the bottom row and up to the top right finds the word going that way,
+    // however much more often the straight one along the top row was seen; and the reverse.
+    std::vector<const KeyBox*> top, bottom;
+    for (const KeyBox& box : keyBoxes(0))
+    {
+        const LLWString text = utf8str_to_wstring(box.def.text);
+        if (box.def.action == TEXT && text.size() == 1 && isLetter(text[0]) && box.rect.mTop > KEYS_TOP - 0.5f * UNIT)
+        {
+            top.push_back(&box);
+        }
+        else if (box.def.action == TEXT && text.size() == 1 && isLetter(text[0]) && box.rect.mTop < KEYS_TOP - 1.5f * UNIT)
+        {
+            bottom.push_back(&box);
+        }
+    }
+    if (top.size() >= 2 && !bottom.empty())
+    {
+        auto centre = [](const KeyBox* box) { return LLVector2(box->rect.getCenterX(), box->rect.getCenterY()); };
+        const LLWString first = utf8str_to_wstring(top.front()->def.text), last = utf8str_to_wstring(top.back()->def.text),
+                        low = utf8str_to_wstring(bottom.front()->def.text);
+        const LLWString bent = first + low + last, straight = first + last;
+        keyboard.mPrevious.clear();
+        keyboard.mTyped.words[wordKey(bent)] = 1;
+        keyboard.mTyped.words[wordKey(straight)] = 50;
+        LLWString found[3];
+        llassert_always(keyboard.swipeWords(resample({ centre(top.front()), centre(bottom.front()), centre(top.back()) }, 40), found) >= 1
+                        && wordKey(found[0]) == wordKey(bent));
+        llassert_always(keyboard.swipeWords(resample({ centre(top.front()), centre(top.back()) }, 40), found) >= 1
+                        && wordKey(found[0]) == wordKey(straight));
+    }
 }

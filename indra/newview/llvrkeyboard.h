@@ -17,10 +17,14 @@
 #define LL_LLVRKEYBOARD_H
 
 #include "llstring.h"
+#include "v2math.h"
 
 #include <future>
 #include <map>
 #include <string>
+#include <vector>
+
+class LLColor4;
 
 class LLVRKeyboard
 {
@@ -42,13 +46,22 @@ public:
     void update();
 
     // Into the bound WIDTH x HEIGHT image, in a matching 2D projection.
-    // hover: what each hand's laser is on.
-    void draw(const Hit hover[2]) const;
+    // hover: what each hand's laser is on; trail: the colour of the swipe trail.
+    void draw(const Hit hover[2], const LLColor4& trail) const;
 
     // Trigger pressed on a key or suggestion: typed, typed and repeats while held
     // (backspace), or the settings key, which the caller answers.
     enum EPress { TYPED, REPEATS, SETTINGS };
     EPress press(const Hit& hit);
+
+    // Swipe typing (SLVRSwipeTyping): the trigger pressed on a letter starts a swipe instead
+    // of typing it (true); the laser's points (image pixels) follow while it is held; on the
+    // release the word whose keys the path went over is typed, or the letter alone if the
+    // laser never left its key.
+    bool swipeStart(const Hit& hit, S32 x, S32 y);
+    void swipeMove(S32 x, S32 y);
+    void swipeEnd();
+    bool swiping() const { return mSwiping; }
 
     // Back to letters, shift off; when the keyboard goes away.
     void reset();
@@ -75,6 +88,18 @@ private:
     std::string mPrevious;  // the word before that in the same sentence, lower case; or empty
     std::string mContext;   // what mSuggestions were worked out for
     LLWString mSuggestions[3];
+
+    // Swipe typing. The words whose key path is most like `path` (image pixels), likeliest
+    // first, lower case; how many were found.
+    S32 swipeWords(const std::vector<LLVector2>& path, LLWString out[3]) const;
+    bool mSwiping = false;
+    Hit mSwipeKey;                  // the key it started on
+    bool mSwipeLeftKey = false;     // the laser has been off that key
+    std::vector<LLVector2> mSwipePath;
+    struct TrailPoint { LLVector2 pos; F64 time; };
+    std::vector<TrailPoint> mTrail; // fades from its oldest point; stays after the release until gone
+    LLWString mSwiped;              // the word a swipe typed, with its space, while still just before the cursor
+    LLWString mSwipeOthers[2];      // the next likeliest words, offered in its place
 };
 
 #endif

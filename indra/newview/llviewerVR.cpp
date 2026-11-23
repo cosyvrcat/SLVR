@@ -929,6 +929,7 @@ void LLViewerVR::updatePointer()
     }
     if (pointAtKeyboard(0, pos, dir, mLaserLength))
     {
+        mKeyboard.swipeMove(mKeyboardX[0], mKeyboardY[0]);
         return;
     }
     if (hitPanel(pos, dir, mPointerX, mPointerY, mLaserLength))
@@ -950,10 +951,11 @@ void LLViewerVR::updatePointer()
 }
 
 // The left hand points only while the on-screen keyboard is up (shown last frame), so that
-// both hands can type; the rest of the time its trigger and grip have other jobs.
+// both hands can type; the rest of the time its trigger and grip have other jobs. Not while
+// the right hand swipes a word, which takes no other hand.
 void LLViewerVR::updateLeftPointer()
 {
-    if (!mInput.left_aim_valid || !mKeyboardShown)
+    if (!mInput.left_aim_valid || !mKeyboardShown || mKeyboard.swiping())
     {
         mLeftSteady.valid = false;
         mKeyboardHit[1] = LLVRKeyboard::Hit();
@@ -2018,8 +2020,17 @@ void LLViewerVR::drawChatOnly()
     for (LLView* view : views)
     {
         const LLRect r = view->calcScreenRect(); // UI units
-        mPanelKeep.emplace_back(llfloor(r.mLeft * scale.mV[VX]), llceil(r.mTop * scale.mV[VY]),
-                                llceil(r.mRight * scale.mV[VX]), llfloor(r.mBottom * scale.mV[VY]));
+        LLRect keep = r;
+        if (dynamic_cast<PieMenu*>(view))
+        {
+            // A pie pops up at 1.7 times its radius, its shading ring 1.09 times that
+            // (piemenu.cpp), and shrinks on the release of the press that opened it. In VR
+            // that release goes to the tool, so it stays big; within its own rectangle only,
+            // the outer half of the slices let the laser through.
+            keep.stretch(ll_round(r.getWidth() / 2 * (1.7f * 1.09f - 1.f)));
+        }
+        mPanelKeep.emplace_back(llfloor(keep.mLeft * scale.mV[VX]), llceil(keep.mTop * scale.mV[VY]),
+                                llceil(keep.mRight * scale.mV[VX]), llfloor(keep.mBottom * scale.mV[VY]));
         LLUI::pushMatrix();
         LLUI::translate((F32)r.mLeft, (F32)r.mBottom);
         // Alone on the panel a pie menu reads fainter than over the whole UI. Drawn over
@@ -2135,7 +2146,7 @@ void LLViewerVR::drawKeyboard(ShotLayer* shot)
         gGLCoverageAlpha = true;
         gGL.blendFunc(LLRender::BF_SOURCE_ALPHA, LLRender::BF_ONE_MINUS_SOURCE_ALPHA);
         gUIProgram.bind();
-        mKeyboard.draw(mKeyboardHit);
+        mKeyboard.draw(mKeyboardHit, laserColour());
         for (S32 hand = 0; hand < 2; ++hand)
         {
             if (mKeyboardHit[hand].part != LLVRKeyboard::NONE && mDragHand != hand)
@@ -2515,6 +2526,10 @@ void LLViewerVR::pressKeyboard(S32 hand)
         mDragHand = hand;
         mDragDistance = hand ? mLeftLaserLength : mLaserLength;
     }
+    else if (hand == 0 && mKeyboard.swipeStart(hit, mKeyboardX[0], mKeyboardY[0]))
+    {
+        // the right trigger held over the letters swipes a word; see LLVRKeyboard::swipeEnd()
+    }
     else
     {
         const LLVRKeyboard::EPress result = mKeyboard.press(hit);
@@ -2556,6 +2571,10 @@ void LLViewerVR::releaseKeyboard(S32 hand)
     if (mRepeatHand == hand)
     {
         mRepeatHand = -1;
+    }
+    if (hand == 0)
+    {
+        mKeyboard.swipeEnd();
     }
 }
 

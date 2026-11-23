@@ -130,6 +130,7 @@ namespace
             getChild<LLTextBox>("language_label")->setText(LLVRLanguage::text("language_label"));
             getChild<LLTextBox>("keyboard_label")->setText(LLVRLanguage::text("keyboard_label"));
             getChild<LLCheckBoxCtrl>("word_suggestions")->setLabel(LLVRLanguage::text("word_suggestions"));
+            getChild<LLCheckBoxCtrl>("swipe_typing")->setLabel(LLVRLanguage::text("swipe_typing"));
             getChild<LLCheckBoxCtrl>("message_dot_private")->setLabel(LLVRLanguage::text("message_dot_private"));
             getChild<LLCheckBoxCtrl>("smooth_turn")->setLabel(LLVRLanguage::text("smooth_turn"));
             getChild<LLTextBox>("vignette_label")->setText(LLVRLanguage::text("vignette_label"));
