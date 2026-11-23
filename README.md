@@ -79,6 +79,9 @@ This repository holds **source code only**. No builds are published here.
   together with any open script dialogs. Drag a window by its title bar to move it anywhere
   around you. A glowing dot shows unread messages (private chats only by default).
 - Context and pie menus open where you look; a trigger press beside one closes it.
+- With the panel hidden or only the chat shown, the windows you open, alerts from the grid
+  (a refused teleport, an ejection) and questions from objects (an attach request) still
+  come up in front of you, square on to your eyes, and the keyboard works in them.
 - A left-handed mode that swaps the controllers.
 - Your real controllers in your hands: Meta Quest Touch Plus models, textured, from Meta's
   own controller art (see [Controller models](#controller-models)). Without them, simple
@@ -182,6 +185,7 @@ the headset before the next one builds on it.
 
 | Version | What it added |
 | --- | --- |
+| 0.6.5 | Alerts and object questions over a hidden panel, menus and dialogs square on to the eyes, keyboard in windows opened over a hidden panel, settings alone from the keyboard too |
 | 0.6.4 | Keyboard comes up on text fields again, windows carried round you by their title bar, panel follows sooner, longer teleport, settings alone from the wrist menu |
 | 0.6.3 | Swipe typing on the keyboard; pie menu slices take the laser to their edge |
 | 0.6.2 | Keyboard only on text fields and at the waist, chat window stays put and moves in space, steadier vignette, menus where you look, longer teleport, clearer running, instant lighter-graphics switch |

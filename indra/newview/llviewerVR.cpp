@@ -34,6 +34,10 @@
 #include "llrender2dutils.h"
 #include "llspatialpartition.h"
 #include "lltoast.h"
+#include "lltoastalertpanel.h"
+#include "lltoastnotifypanel.h"
+#include "lltoastscriptquestion.h"
+#include "llpanelgenerictip.h"
 #include "lltool.h"
 #include "lltoolmgr.h"
 #include "lluictrl.h"
@@ -211,6 +215,16 @@ namespace
     // level, square on to the eyes, so it leans back like a laptop's keyboard.
     const F32 KEYBOARD_BELOW = 40.f * DEG_TO_RAD;
 
+    // A notice that shows over a hidden panel or the chat alone, asked for or not: an alert or
+    // tip from the grid (a teleport refused as too short, being ejected) or a question from an
+    // object (an attach request). Not a chat or IM bubble, a friend coming online, a group notice.
+    bool isNotice(const LLNotificationsUI::LLToast* toast)
+    {
+        const LLPanel* panel = toast->getPanel();
+        return dynamic_cast<const LLToastAlertPanel*>(panel) || dynamic_cast<const LLToastNotifyPanel*>(panel)
+               || dynamic_cast<const LLToastScriptQuestion*>(panel) || dynamic_cast<const LLPanelGenericTip*>(panel);
+    }
+
     // What a press just sent to the UI landed on, told by what took the mouse: a field that
     // takes text, a window's title bar, or something else. Not by the views at the point:
     // there, full-window views that let the mouse through are in front of the windows, and
@@ -286,7 +300,7 @@ namespace
         return LLRect(col * w + 8, WRIST_HEIGHT - row * h - 8, (col + 1) * w - 8, WRIST_HEIGHT - (row + 1) * h + 8);
     }
     // SLVRPanelFollow: the panel glides back once the eyes are this far off it, until it is this near.
-    const F32 PANEL_FOLLOW_AWAY = 35.f * DEG_TO_RAD, PANEL_FOLLOW_NEAR = 3.f * DEG_TO_RAD;
+    const F32 PANEL_FOLLOW_AWAY = 40.f * DEG_TO_RAD, PANEL_FOLLOW_NEAR = 3.f * DEG_TO_RAD;
     const F32 PANEL_FOLLOW_RATE = 1.f; // Hz
 
     F32 snapTurn()
@@ -1784,18 +1798,7 @@ void LLViewerVR::pressWrist()
         }
         break;
     case 2:
-        if (mPanelVisible && !mChatOnly)
-        {
-            showSettings();
-        }
-        else if (LLFloater* settings = LLFloaterReg::showInstance("slvr_settings", LLSD(), true))
-        {
-            // Alone, over what is shown, as a window opened from a menu is (see updatePopped()).
-            if (!isPopped(settings))
-            {
-                mPopped.push_back(settings->getHandle());
-            }
-        }
+        showSettings();
         placePanel(LLFloaterReg::findInstance("slvr_settings"));
         break;
     case 3:
@@ -1873,9 +1876,12 @@ bool LLViewerVR::measureHeight(F32& body_height)
 
 F32 LLViewerVR::panelRadius() const
 {
-    // Bent round the eyes at its distance; not past a half turn, however near and wide.
+    // Bent round the eyes at its distance; not past a half turn, however near and wide. Only
+    // the whole panel: a window shown alone is put square on to the eyes as on a flat panel
+    // (placePanel()), and bent with the panel it was turned aside by as much as it lay off
+    // the panel's middle (pie menus and script dialogs seen at a slant).
     static LLCachedControl<bool> curved(gSavedSettings, "SLVRCurvedPanel", true);
-    return curved && mBackend.canCurve() ? llmax(mPanelDistance, mPanelWidth / 3.f) : 0.f;
+    return curved && mBackend.canCurve() && mPanelVisible && !mChatOnly ? llmax(mPanelDistance, mPanelWidth / 3.f) : 0.f;
 }
 
 // Draws the HUD attachments and the flat UI into the panel image instead of the window.
@@ -2056,14 +2062,16 @@ void LLViewerVR::drawChatOnly()
 // With the panel hidden or showing only the chat, a window the user asked for (an item of a
 // pie or context menu, a link in the chat, the dialog of a chair just touched) would open
 // out of sight. Those are drawn as well, until they close; windows and dialogs nobody asked
-// for (a group's object calling) are not. Back on the whole panel the list starts over.
+// for (a group's object calling) are not, but notices are (isNotice()). Back on the whole
+// panel the list starts over.
 void LLViewerVR::updatePopped()
 {
     std::vector<LLFloater*> shown;
     for (LLView* view : *gFloaterView->getChildList())
     {
         LLFloater* floater = dynamic_cast<LLFloater*>(view);
-        if (floater && floater->isShown() && !floater->getHost() && !dynamic_cast<LLNotificationsUI::LLToast*>(floater)) // not chat bubbles
+        const LLNotificationsUI::LLToast* toast = dynamic_cast<LLNotificationsUI::LLToast*>(floater);
+        if (floater && floater->isShown() && !floater->getHost() && (!toast || isNotice(toast))) // not chat bubbles
         {
             shown.push_back(floater);
         }
@@ -2086,7 +2094,8 @@ void LLViewerVR::updatePopped()
         for (LLFloater* floater : shown)
         {
             const bool opened = floater == focus_floater || std::find(mShownBefore.begin(), mShownBefore.end(), floater) == mShownBefore.end();
-            if (asked && opened && !isPopped(floater) && !(mChatOnly && isChatFloater(floater)))
+            const bool notice = dynamic_cast<LLNotificationsUI::LLToast*>(floater) != nullptr; // see isNotice(), asked for or not
+            if ((asked || notice) && opened && !isPopped(floater) && !(mChatOnly && isChatFloater(floater)))
             {
                 mPopped.push_back(floater->getHandle());
                 placePanel(floater); // where the user looks, not at the window's corner of the panel
@@ -2459,7 +2468,7 @@ void LLViewerVR::updateKeyboard()
     // Only once a text field was pressed (mKeyboardWanted): a press anywhere on a conversation
     // window gives its text field the focus, and the keyboard came up with every one.
     LLUICtrl* focus = dynamic_cast<LLUICtrl*>(gFocusMgr.getKeyboardFocus());
-    const bool shown = mPanelVisible && mKeyboardWanted && focus && focus->acceptsTextInput();
+    const bool shown = panelShown() && mKeyboardWanted && focus && focus->acceptsTextInput(); // the panel, or windows of it
     if (!shown)
     {
         if (mKeyboardShown)
@@ -2551,12 +2560,20 @@ void LLViewerVR::pressKeyboard(S32 hand)
     }
 }
 
-// The keyboard's settings key: the SLVR settings, on the whole panel so they can be seen.
+// The SLVR settings (wrist menu, keyboard's settings key). Over a hidden panel or the chat
+// alone they come up alone, in front of the eyes, as a window opened from a menu does (see
+// updatePopped()); the whole panel showing with them was not asked for.
 void LLViewerVR::showSettings()
 {
-    mPanelVisible = true;
-    mChatOnly = false;
-    LLFloaterReg::showInstance("slvr_settings", LLSD(), true);
+    LLFloater* settings = LLFloaterReg::showInstance("slvr_settings", LLSD(), true);
+    if (settings && (!mPanelVisible || mChatOnly))
+    {
+        if (!isPopped(settings))
+        {
+            mPopped.push_back(settings->getHandle());
+        }
+        placePanel(settings);
+    }
 }
 
 void LLViewerVR::releaseKeyboard(S32 hand)
