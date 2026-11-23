@@ -91,6 +91,9 @@ This repository holds **source code only**. No builds are published here.
   emoticons, a repeating backspace, shift and caps lock. It comes up when you press a text
   field, low in front of you and tilted back, so you can type with your arms resting.
 - Word completion and next-word prediction, learned locally from your own chat logs.
+- Swipe typing: hold the right trigger on the first letter and glide over the others; the
+  word is typed as you let go, with a fading trail in your laser's colour behind the
+  pointer. The next likeliest words are offered in its place. It can be switched off.
 - Layouts for English, Turkish, Azerbaijani, Danish, German, Spanish, French, Italian, Polish,
   Portuguese and Russian.
 
@@ -106,7 +109,7 @@ button stays on the left.
 
 | Control | Action |
 | --- | --- |
-| Right trigger | Left click (UI or world) |
+| Right trigger | Left click (UI or world); on the keyboard, hold and glide over the letters to swipe a word |
 | Right grip | Right click: context and pie menus, opened where you look |
 | Right stick left/right | Turn (snap or smooth) |
 | Right stick up/down | Jump or crouch; held up, start flying; rise or sink while flying |
@@ -179,6 +182,7 @@ the headset before the next one builds on it.
 
 | Version | What it added |
 | --- | --- |
+| 0.6.3 | Swipe typing on the keyboard; pie menu slices take the laser to their edge |
 | 0.6.2 | Keyboard only on text fields and at the waist, chat window stays put and moves in space, steadier vignette, menus where you look, longer teleport, clearer running, instant lighter-graphics switch |
 | 0.6.1 | Meta Quest Touch Plus controller models, with an option to hide the controllers |
 | 0.6.0 | Arc teleport, push-to-talk, recentring, running, haptics, wrist menu, curved panel, left-handed mode, own-height mode, script camera guard, VR text scale, lighter VR graphics, two-column settings |
