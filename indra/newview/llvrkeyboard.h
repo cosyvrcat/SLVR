@@ -61,7 +61,7 @@ public:
     bool swipeStart(const Hit& hit, S32 x, S32 y);
     void swipeMove(S32 x, S32 y);
     void swipeEnd();
-    bool swiping() const { return mSwiping; }
+    bool swiping() const { return mSwiping && mSwipeSure; } // a press not yet a swipe is not
 
     // Back to letters, shift off; when the keyboard goes away.
     void reset();
@@ -95,6 +95,9 @@ private:
     bool mSwiping = false;
     Hit mSwipeKey;                  // the key it started on
     bool mSwipeLeftKey = false;     // the laser has been off that key
+    bool mSwipeSure = false;        // it went far and long enough to be a swipe, see SWIPE_MIN_PATH
+    F32 mSwipeLength = 0.f;         // pixels the laser went
+    F64 mSwipeStarted = 0.0;
     std::vector<LLVector2> mSwipePath;
     struct TrailPoint { LLVector2 pos; F64 time; };
     std::vector<TrailPoint> mTrail; // fades from its oldest point; stays after the release until gone

@@ -130,6 +130,8 @@ private:
     void drawChatOnly();
     void updatePopped();
     bool isPopped(const LLFloater* floater) const;
+    void arrangePopped();
+    void resetPanelSize();
     bool panelShown() const { return mPanelVisible || mMenuOnly || !mPopped.empty(); }
     void logZoom() const;
     void drawKeyboard(ShotLayer* shot);

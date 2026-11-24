@@ -38,6 +38,9 @@
 #include "lltoastnotifypanel.h"
 #include "lltoastscriptquestion.h"
 #include "llpanelgenerictip.h"
+#include "llscriptfloater.h"
+#include "lltoolpie.h"
+#include "llviewerobjectlist.h"
 #include "lltool.h"
 #include "lltoolmgr.h"
 #include "lluictrl.h"
@@ -214,6 +217,8 @@ namespace
     // the arms: straight ahead of the face (its heading only), this far below the eyes'
     // level, square on to the eyes, so it leans back like a laptop's keyboard.
     const F32 KEYBOARD_BELOW = 40.f * DEG_TO_RAD;
+    // From there it goes this many of its own heights up its slope (Sinan: it sat a little low).
+    const F32 KEYBOARD_RAISE = 2.f;
 
     // A notice that shows over a hidden panel or the chat alone, asked for or not: an alert or
     // tip from the grid (a teleport refused as too short, being ejected) or a question from an
@@ -223,6 +228,17 @@ namespace
         const LLPanel* panel = toast->getPanel();
         return dynamic_cast<const LLToastAlertPanel*>(panel) || dynamic_cast<const LLToastNotifyPanel*>(panel)
                || dynamic_cast<const LLToastScriptQuestion*>(panel) || dynamic_cast<const LLPanelGenericTip*>(panel);
+    }
+
+    // Whether a script dialog (or an object's gift) comes from the object last clicked or
+    // touched, its link set included. A shop's greeter calling out to whoever arrives does not,
+    // even within POP_AFTER_PRESS of a press.
+    bool fromTouched(LLScriptFloater* dialog)
+    {
+        LLNotificationPtr notification = LLNotifications::instance().find(dialog->getNotificationId());
+        LLViewerObject* from = notification ? gObjectList.findObject(notification->getPayload()["object_id"].asUUID()) : nullptr;
+        LLViewerObject* touched = LLToolPie::getInstance()->getPick().getObject().get();
+        return from && touched && from->getRootEdit() == touched->getRootEdit();
     }
 
     // What a press just sent to the UI landed on, told by what took the mouse: a field that
@@ -1400,15 +1416,18 @@ void LLViewerVR::recenter()
 void LLViewerVR::followPanel()
 {
     static LLCachedControl<bool> follow(gSavedSettings, "SLVRPanelFollow", false);
-    if (!follow || !mPanelVisible || mGrabbing || mTitleDrag || mEye < 0)
+    // On a hidden panel, the windows shown on it follow too (the settings did not).
+    const LLFloater* popped = !mPanelVisible && !mPopped.empty() ? mPopped.back().get() : nullptr;
+    if (!follow || !(mPanelVisible || popped) || mGrabbing || mTitleDrag || mEye < 0)
     {
         mPanelFollowing = false;
         return;
     }
     // With only the chat shown, the conversation window comes in front of the eyes, not the
-    // panel's middle, which left the window off to the side.
+    // panel's middle, which left the window off to the side; on a hidden panel, the newest
+    // window shown on it.
     F32 dx = 0.f, dy = 0.f;
-    windowOffset(mChatOnly ? chatFloater() : nullptr, dx, dy);
+    windowOffset(mChatOnly ? chatFloater() : popped, dx, dy);
     const float FORWARD[3] = { 0.f, 0.f, -1.f }, RIGHT[3] = { 1.f, 0.f, 0.f }, UP[3] = { 0.f, 1.f, 0.f };
     float eyes[3], look[3], centre[3], rot[4], right[3], up[3];
     rotate(mPanelRot, RIGHT, right);
@@ -1780,6 +1799,7 @@ void LLViewerVR::pressWrist()
         // button): placed anew, the conversation window jumped aside to its spot on the panel.
         if (!mPanelVisible)
         {
+            resetPanelSize();
             placePanel(nullptr);
         }
         mPanelVisible = mChatOnly ? true : !mPanelVisible;
@@ -1799,7 +1819,10 @@ void LLViewerVR::pressWrist()
         break;
     case 2:
         showSettings();
-        placePanel(LLFloaterReg::findInstance("slvr_settings"));
+        if (!mChatOnly)
+        {
+            placePanel(LLFloaterReg::findInstance("slvr_settings"));
+        }
         break;
     case 3:
         requestScreenshot();
@@ -2095,15 +2118,69 @@ void LLViewerVR::updatePopped()
         {
             const bool opened = floater == focus_floater || std::find(mShownBefore.begin(), mShownBefore.end(), floater) == mShownBefore.end();
             const bool notice = dynamic_cast<LLNotificationsUI::LLToast*>(floater) != nullptr; // see isNotice(), asked for or not
-            if ((asked || notice) && opened && !isPopped(floater) && !(mChatOnly && isChatFloater(floater)))
+            LLScriptFloater* dialog = dynamic_cast<LLScriptFloater*>(floater);
+            if ((notice || (asked && (!dialog || fromTouched(dialog)))) && opened && !isPopped(floater) && !(mChatOnly && isChatFloater(floater)))
             {
                 mPopped.push_back(floater->getHandle());
-                placePanel(floater); // where the user looks, not at the window's corner of the panel
+                if (!mChatOnly) // with the chat they go round it, see arrangePopped()
+                {
+                    placePanel(floater); // where the user looks, not at the window's corner of the panel
+                }
             }
         }
+        arrangePopped();
     }
     mShownBefore.assign(shown.begin(), shown.end());
     mFocusBefore = focus;
+}
+
+// With the chat alone, the windows shown with it go round the conversation window, so they
+// move with it (the chat window is what follows the eyes) and do not cover it or push it
+// aside: script dialogs right above it, notices above those (the newest on top), anything
+// else (the settings) to its right. Each frame: notices are moved by their channel too.
+// shortcut: a tall stack runs out of the top of the image; trim it if that happens.
+void LLViewerVR::arrangePopped()
+{
+    LLFloater* chat = chatFloater();
+    if (!mChatOnly || !chat)
+    {
+        return;
+    }
+    const S32 GAP = 4;
+    const LLRect c = chat->calcScreenRect(); // UI units
+    S32 above = c.mTop, right = c.mRight;
+    for (S32 pass = 0; pass < 2; ++pass) // the dialogs first, nearest the chat
+    {
+        for (const LLHandle<LLFloater>& handle : mPopped)
+        {
+            LLFloater* floater = handle.get();
+            if (!floater)
+            {
+                continue;
+            }
+            const bool dialog = dynamic_cast<LLScriptFloater*>(floater) != nullptr;
+            const bool notice = dynamic_cast<LLNotificationsUI::LLToast*>(floater) != nullptr;
+            S32 x = 0, y = 0;
+            if (pass == 0 ? dialog : notice)
+            {
+                gFloaterView->screenPointToLocal(c.mLeft, above + GAP, &x, &y);
+                above += GAP + floater->getRect().getHeight();
+            }
+            else if (pass == 1 && !dialog && !notice)
+            {
+                gFloaterView->screenPointToLocal(right + GAP, c.mBottom, &x, &y);
+                right += GAP + floater->getRect().getWidth();
+            }
+            else
+            {
+                continue;
+            }
+            if (floater->getRect().mLeft != x || floater->getRect().mBottom != y)
+            {
+                floater->setOrigin(x, y);
+            }
+        }
+    }
 }
 
 bool LLViewerVR::isPopped(const LLFloater* floater) const
@@ -2275,6 +2352,15 @@ void LLViewerVR::placePanel(const LLView* around)
         eyes[i] = (mEyes[0].pos[i] + mEyes[1].pos[i]) / 2.f;
     }
     placeAhead(eyes, mEyes[0].rot, mPanelDistance, dx, dy, mPanelCentre, mPanelRot);
+}
+
+// The whole panel comes up at its default width and distance each time it is brought up
+// (Sinan: nearly all of it in view, the edges a slight turn of the head away; nearer, the
+// eyes on its top menus turned it away). Moving and resizing it holds until it is hidden.
+void LLViewerVR::resetPanelSize()
+{
+    mPanelWidth = llclamp((F32)gSavedSettings.getControl("SLVRPanelWidth")->getDefault().asReal(), PANEL_NARROW, PANEL_WIDE);
+    mPanelDistance = llclamp((F32)gSavedSettings.getControl("SLVRPanelDistance")->getDefault().asReal(), PANEL_NEAR, PANEL_FAR);
 }
 
 // Metres from the panel's middle to a window's (in the panel's plane, right and up); none
@@ -2495,6 +2581,13 @@ void LLViewerVR::updateKeyboard()
             eyes[i] = (mEyes[0].pos[i] + mEyes[1].pos[i]) / 2.f;
         }
         placeAlong(eyes, ahead, mKeyboardAhead, 0.f, 0.f, mKeyboardCentre, mKeyboardRot);
+        float slope[3];
+        rotate(mKeyboardRot, UP, slope);
+        const F32 raise = KEYBOARD_RAISE * mKeyboardWidth * LLVRKeyboard::HEIGHT / LLVRKeyboard::WIDTH;
+        for (S32 i = 0; i < 3; ++i)
+        {
+            mKeyboardCentre[i] += slope[i] * raise;
+        }
     }
     mKeyboardShown = true;
     mKeyboard.update();
@@ -2534,6 +2627,10 @@ void LLViewerVR::startZoom()
 void LLViewerVR::pressKeyboard(S32 hand)
 {
     const LLVRKeyboard::Hit hit = mKeyboardHit[hand];
+    if (hand == 1 && !mKeyboard.swiping())
+    {
+        mKeyboard.swipeEnd(); // a right press not yet a swipe was a tap: its letter comes first
+    }
     if (hit.part == LLVRKeyboard::HANDLE)
     {
         mDragHand = hand;
@@ -2572,7 +2669,10 @@ void LLViewerVR::showSettings()
         {
             mPopped.push_back(settings->getHandle());
         }
-        placePanel(settings);
+        if (!mChatOnly) // beside the chat, see arrangePopped()
+        {
+            placePanel(settings);
+        }
     }
 }
 
@@ -2630,6 +2730,7 @@ void LLViewerVR::applyInput()
         if (!mPanelVisible)
         {
             mPanelVisible = true;
+            resetPanelSize();
             placePanel(nullptr);
         }
         else if (!mChatOnly)

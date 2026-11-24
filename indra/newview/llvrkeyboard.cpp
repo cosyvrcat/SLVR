@@ -472,6 +472,11 @@ namespace
     const F32 SWIPE_SHAPE_WEIGHT = 12.f; // against the log of how often a word was seen
     const F32 SWIPE_POINT_STEP = 4.f;   // pixels the laser moves before a new point is kept
     const F32 TRAIL_LIFE = 0.45f;       // seconds a point of the trail takes to fade
+    // A press only becomes a swipe once the laser has gone this far (keys) over this long
+    // (seconds) after leaving its key; quicker or shorter, it is a tap that typed its letter.
+    // Fast typing with both hands moved the laser off the key before the release and swiped.
+    const F32 SWIPE_MIN_PATH = 1.5f;
+    const F32 SWIPE_MIN_TIME = 0.25f;
 
     // Spreads a path's length evenly over n points.
     std::vector<LLVector2> resample(const std::vector<LLVector2>& path, S32 n)
@@ -625,7 +630,7 @@ void LLVRKeyboard::draw(const Hit hover[2], const LLColor4& trail) const
     // The swipe trail, over the keys: each stretch thins and fades as it ages, so the trail
     // grows at the laser and dies away from where it began.
     const F64 now = LLFrameTimer::getElapsedSeconds();
-    for (size_t i = 1; i < mTrail.size(); ++i)
+    for (size_t i = 1; (!mSwiping || mSwipeSure) && i < mTrail.size(); ++i)
     {
         const F32 life = 1.f - (F32)(now - mTrail[i - 1].time) / TRAIL_LIFE;
         if (life > 0.f)
@@ -652,8 +657,11 @@ bool LLVRKeyboard::swipeStart(const Hit& hit, S32 x, S32 y)
         return false;
     }
     mSwiping = true;
+    mSwipeSure = false;
     mSwipeKey = hit;
     mSwipeLeftKey = false;
+    mSwipeLength = 0.f;
+    mSwipeStarted = LLFrameTimer::getElapsedSeconds();
     mSwipePath.assign(1, LLVector2((F32)x, (F32)y));
     mTrail.assign(1, { mSwipePath[0], LLFrameTimer::getElapsedSeconds() });
     return true;
@@ -666,9 +674,12 @@ void LLVRKeyboard::swipeMove(S32 x, S32 y)
     {
         return;
     }
+    mSwipeLength += dist_vec(point, mSwipePath.back());
     mSwipePath.push_back(point);
-    mTrail.push_back({ point, LLFrameTimer::getElapsedSeconds() });
+    const F64 now = LLFrameTimer::getElapsedSeconds();
+    mTrail.push_back({ point, now });
     mSwipeLeftKey = mSwipeLeftKey || !(hitAt(x, y) == mSwipeKey);
+    mSwipeSure = mSwipeSure || (mSwipeLeftKey && mSwipeLength >= SWIPE_MIN_PATH * UNIT && now - mSwipeStarted >= SWIPE_MIN_TIME);
 }
 
 void LLVRKeyboard::swipeEnd()
@@ -678,7 +689,7 @@ void LLVRKeyboard::swipeEnd()
         return;
     }
     mSwiping = false;
-    if (!mSwipeLeftKey) // a tap: the letter alone
+    if (!mSwipeSure) // a tap: the letter alone
     {
         mTrail.clear();
         press(mSwipeKey);

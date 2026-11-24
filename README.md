@@ -81,7 +81,10 @@ This repository holds **source code only**. No builds are published here.
 - Context and pie menus open where you look; a trigger press beside one closes it.
 - With the panel hidden or only the chat shown, the windows you open, alerts from the grid
   (a refused teleport, an ejection) and questions from objects (an attach request) still
-  come up in front of you, square on to your eyes, and the keyboard works in them.
+  come up in front of you, square on to your eyes, and the keyboard works in them. With the
+  chat shown, script dialogs and alerts stack just above the conversation window and move
+  with it. Script dialogs come up only from the object you touched, not from a shop greeting
+  you as you arrive.
 - A left-handed mode that swaps the controllers.
 - Your real controllers in your hands: Meta Quest Touch Plus models, textured, from Meta's
   own controller art (see [Controller models](#controller-models)). Without them, simple
@@ -96,7 +99,9 @@ This repository holds **source code only**. No builds are published here.
 - Word completion and next-word prediction, learned locally from your own chat logs.
 - Swipe typing: hold the right trigger on the first letter and glide over the others; the
   word is typed as you let go, with a fading trail in your laser's colour behind the
-  pointer. The next likeliest words are offered in its place. It can be switched off.
+  pointer. The next likeliest words are offered in its place. Quick presses always type
+  their letter, so fast typing with both hands is not taken for a swipe. It can be switched
+  off.
 - Layouts for English, Turkish, Azerbaijani, Danish, German, Spanish, French, Italian, Polish,
   Portuguese and Russian.
 
@@ -185,6 +190,7 @@ the headset before the next one builds on it.
 
 | Version | What it added |
 | --- | --- |
+| 0.6.6 | Dialogs and alerts stack above the chat window, shop dialogs stay out of the hidden panel, windows on a hidden panel follow you, the keyboard sits higher, a wider default panel distance, swipe typing that leaves quick presses alone |
 | 0.6.5 | Alerts and object questions over a hidden panel, menus and dialogs square on to the eyes, keyboard in windows opened over a hidden panel, settings alone from the keyboard too |
 | 0.6.4 | Keyboard comes up on text fields again, windows carried round you by their title bar, panel follows sooner, longer teleport, settings alone from the wrist menu |
 | 0.6.3 | Swipe typing on the keyboard; pie menu slices take the laser to their edge |
