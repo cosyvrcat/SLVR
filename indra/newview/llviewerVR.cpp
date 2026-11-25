@@ -217,11 +217,12 @@ namespace
     // the arms: straight ahead of the face (its heading only), this far below the eyes'
     // level, square on to the eyes, so it leans back like a laptop's keyboard.
     const F32 KEYBOARD_BELOW = 40.f * DEG_TO_RAD;
-    // From there it goes this many of its own heights up its slope (Sinan: it sat a little low)
-    // and this many nearer the eyes, and then leans back only this far from upright (Sinan:
-    // some 80 degrees off the floor; square on to the eyes it lay too flat).
-    const F32 KEYBOARD_RAISE = 2.f, KEYBOARD_NEARER = 1.f;
-    const F32 KEYBOARD_LEAN = 10.f * DEG_TO_RAD;
+    // From there it goes this many of its own heights up its slope (Sinan: at 2 it covered the
+    // chat and the arms left the armrests), stays as far from the eyes as it was last dropped
+    // (SLVRKeyboardReach; a fixed step nearer on top of that brought it back nearer than
+    // dropped), and leans back only this far from upright (Sinan: some 75 degrees off the floor).
+    const F32 KEYBOARD_RAISE = 1.f;
+    const F32 KEYBOARD_LEAN = 15.f * DEG_TO_RAD;
 
     // A notice that shows over a hidden panel or the chat alone, asked for or not: an alert or
     // tip from the grid (a teleport refused as too short, being ejected) or a question from an
@@ -2616,16 +2617,16 @@ void LLViewerVR::updateKeyboard()
         float slope[3];
         rotate(mKeyboardRot, UP, slope);
         const F32 height = mKeyboardWidth * LLVRKeyboard::HEIGHT / LLVRKeyboard::WIDTH;
-        LLVector3 to_eyes;
+        LLVector3 from_eyes;
         for (S32 i = 0; i < 3; ++i)
         {
             mKeyboardCentre[i] += slope[i] * KEYBOARD_RAISE * height;
-            to_eyes.mV[i] = eyes[i] - mKeyboardCentre[i];
+            from_eyes.mV[i] = mKeyboardCentre[i] - eyes[i];
         }
-        to_eyes.normalize();
+        from_eyes.normalize();
         for (S32 i = 0; i < 3; ++i)
         {
-            mKeyboardCentre[i] += to_eyes.mV[i] * KEYBOARD_NEARER * height;
+            mKeyboardCentre[i] = eyes[i] + from_eyes.mV[i] * mKeyboardAhead;
         }
         float lean[3];
         direction(headingOf(ahead), -KEYBOARD_LEAN, lean);
@@ -2699,13 +2700,23 @@ void LLViewerVR::pressKeyboard(S32 hand)
     }
 }
 
-// The SLVR settings (wrist menu, keyboard's settings key). Over a hidden panel or the chat
-// alone they come up alone, in front of the eyes, as a window opened from a menu does (see
-// updatePopped()); the whole panel showing with them was not asked for.
+// The SLVR settings (wrist menu, keyboard's settings key); where they go is settingsOpened().
 void LLViewerVR::showSettings()
 {
-    LLFloater* settings = LLFloaterReg::showInstance("slvr_settings", LLSD(), true);
-    if (settings && (!mPanelVisible || mChatOnly))
+    LLFloaterReg::showInstance("slvr_settings", LLSD(), true);
+}
+
+// The SLVR settings opened, from anywhere (the top menu too, which only shows the window).
+// Over a hidden panel or the chat alone they come up alone, in front of the eyes, as a window
+// opened from a menu does (see updatePopped()); the whole panel showing with them was not
+// asked for.
+void LLViewerVR::settingsOpened(LLFloater* settings)
+{
+    if (!mBackend.isInitialized())
+    {
+        return;
+    }
+    if (!mPanelVisible || mChatOnly)
     {
         if (!isPopped(settings))
         {
@@ -2716,7 +2727,7 @@ void LLViewerVR::showSettings()
             placePanel(settings);
         }
     }
-    else if (LLFloater* chat = settings ? chatFloater() : nullptr)
+    else if (LLFloater* chat = chatFloater())
     {
         // On the whole panel, once as it opens: beside the conversation window, not over it.
         const LLRect c = chat->calcScreenRect();

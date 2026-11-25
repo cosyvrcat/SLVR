@@ -77,6 +77,7 @@ public:
 
     void shutdown();
 
+    void settingsOpened(LLFloater* settings); // the SLVR settings window, see showSettings()
 private:
     void updateEnabled();
     void setEyeCamera();

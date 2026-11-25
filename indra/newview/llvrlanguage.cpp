@@ -124,6 +124,8 @@ namespace
             return true;
         }
 
+        void onOpen(const LLSD&) override { gVR.settingsOpened(this); }
+
         void translate()
         {
             setTitle(LLVRLanguage::text("settings_title"));
