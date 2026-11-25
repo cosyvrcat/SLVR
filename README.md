@@ -95,7 +95,8 @@ This repository holds **source code only**. No builds are published here.
 ### On-screen keyboard
 - A keyboard on its own layer that can be typed with both hands, with a symbols page,
   emoticons, a repeating backspace, shift and caps lock. It comes up when you press a text
-  field, low in front of you and tilted back, so you can type with your arms resting.
+  field, low in front of you and tilted back, so you can type with your arms resting, as far
+  away as you last dragged it.
 - Word completion and next-word prediction, learned locally from your own chat logs.
 - Swipe typing: hold the right trigger on the first letter and glide over the others; the
   word is typed as you let go, with a fading trail in your laser's colour behind the
@@ -190,6 +191,7 @@ the headset before the next one builds on it.
 
 | Version | What it added |
 | --- | --- |
+| 0.6.8 | Keyboard lower and a little more tilted, back at the distance you last dropped it; settings from the SLVR menu also open beside the chat |
 | 0.6.7 | Keyboard nearer and more upright, dialogs beside the chat when there is no room above, settings beside the chat on the full panel, the panel follows only once you look past its edge |
 | 0.6.6 | Dialogs and alerts stack above the chat window, shop dialogs stay out of the hidden panel, windows on a hidden panel follow you, the keyboard sits higher, a wider default panel distance, swipe typing that leaves quick presses alone |
 | 0.6.5 | Alerts and object questions over a hidden panel, menus and dialogs square on to the eyes, keyboard in windows opened over a hidden panel, settings alone from the keyboard too |
