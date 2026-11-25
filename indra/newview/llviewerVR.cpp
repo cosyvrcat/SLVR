@@ -217,8 +217,11 @@ namespace
     // the arms: straight ahead of the face (its heading only), this far below the eyes'
     // level, square on to the eyes, so it leans back like a laptop's keyboard.
     const F32 KEYBOARD_BELOW = 40.f * DEG_TO_RAD;
-    // From there it goes this many of its own heights up its slope (Sinan: it sat a little low).
-    const F32 KEYBOARD_RAISE = 2.f;
+    // From there it goes this many of its own heights up its slope (Sinan: it sat a little low)
+    // and this many nearer the eyes, and then leans back only this far from upright (Sinan:
+    // some 80 degrees off the floor; square on to the eyes it lay too flat).
+    const F32 KEYBOARD_RAISE = 2.f, KEYBOARD_NEARER = 1.f;
+    const F32 KEYBOARD_LEAN = 10.f * DEG_TO_RAD;
 
     // A notice that shows over a hidden panel or the chat alone, asked for or not: an alert or
     // tip from the grid (a teleport refused as too short, being ejected) or a question from an
@@ -316,7 +319,10 @@ namespace
         return LLRect(col * w + 8, WRIST_HEIGHT - row * h - 8, (col + 1) * w - 8, WRIST_HEIGHT - (row + 1) * h + 8);
     }
     // SLVRPanelFollow: the panel glides back once the eyes are this far off it, until it is this near.
+    // The whole panel: no sooner than this far past its own edge, so its edges and corners can
+    // be looked at however near and wide it is (it followed the eyes onto its top menus).
     const F32 PANEL_FOLLOW_AWAY = 40.f * DEG_TO_RAD, PANEL_FOLLOW_NEAR = 3.f * DEG_TO_RAD;
+    const F32 PANEL_FOLLOW_PAST_EDGE = 10.f * DEG_TO_RAD;
     const F32 PANEL_FOLLOW_RATE = 1.f; // Hz
 
     F32 snapTurn()
@@ -1441,7 +1447,14 @@ void LLViewerVR::followPanel()
                        mPanelCentre[2] + right[2] * dx + up[2] * dy - eyes[2]);
     to_panel.normalize();
     const F32 cosine = to_panel.mV[0] * look[0] + to_panel.mV[1] * look[1] + to_panel.mV[2] * look[2];
-    if (cosine < cosf(PANEL_FOLLOW_AWAY))
+    F32 away = PANEL_FOLLOW_AWAY;
+    if (mPanelVisible && !mChatOnly)
+    {
+        const F32 radius = panelRadius();
+        const F32 half = radius > 0.f ? mPanelWidth / (2.f * radius) : atanf(mPanelWidth / (2.f * mPanelDistance));
+        away = llclamp(half + PANEL_FOLLOW_PAST_EDGE, PANEL_FOLLOW_AWAY, F_PI_BY_TWO);
+    }
+    if (cosine < cosf(away))
     {
         mPanelFollowing = true;
     }
@@ -2148,13 +2161,29 @@ void LLViewerVR::arrangePopped()
     }
     const S32 GAP = 4;
     const LLRect c = chat->calcScreenRect(); // UI units
-    S32 above = c.mTop, right = c.mRight;
+    // The dialogs and notices go up in a column from the chat's top, or, when that would run
+    // out of the top of the image (and be cut off), from its bottom on its right.
+    S32 column_height = 0, column_width = 0;
+    for (const LLHandle<LLFloater>& handle : mPopped)
+    {
+        const LLFloater* floater = handle.get();
+        if (floater && (dynamic_cast<const LLScriptFloater*>(floater) || dynamic_cast<const LLNotificationsUI::LLToast*>(floater)))
+        {
+            column_height += GAP + floater->getRect().getHeight();
+            column_width = llmax(column_width, GAP + floater->getRect().getWidth());
+        }
+    }
+    const S32 top = gFloaterView->calcScreenRect().mTop;
+    const bool beside = c.mTop + column_height > top;
+    const S32 column_left = beside ? c.mRight + GAP : c.mLeft;
+    S32 above = beside ? llmin(c.mBottom - GAP, top - column_height) : c.mTop;
+    S32 right = beside ? c.mRight + column_width : c.mRight;
     for (S32 pass = 0; pass < 2; ++pass) // the dialogs first, nearest the chat
     {
         for (const LLHandle<LLFloater>& handle : mPopped)
         {
             LLFloater* floater = handle.get();
-            if (!floater)
+            if (!floater || floater == chat) // a conversation popped on a hidden panel stays put
             {
                 continue;
             }
@@ -2163,7 +2192,7 @@ void LLViewerVR::arrangePopped()
             S32 x = 0, y = 0;
             if (pass == 0 ? dialog : notice)
             {
-                gFloaterView->screenPointToLocal(c.mLeft, above + GAP, &x, &y);
+                gFloaterView->screenPointToLocal(column_left, above + GAP, &x, &y);
                 above += GAP + floater->getRect().getHeight();
             }
             else if (pass == 1 && !dialog && !notice)
@@ -2352,6 +2381,9 @@ void LLViewerVR::placePanel(const LLView* around)
         eyes[i] = (mEyes[0].pos[i] + mEyes[1].pos[i]) / 2.f;
     }
     placeAhead(eyes, mEyes[0].rot, mPanelDistance, dx, dy, mPanelCentre, mPanelRot);
+    // Which window a jump of the panel was for (the chat seen thrown aside by a notice).
+    LL_INFOS("VR") << "Panel placed around " << (around ? around->getName() : std::string("its middle")) << (mChatOnly ? ", chat only" : "")
+                   << (mPanelVisible ? "" : ", hidden") << LL_ENDL;
 }
 
 // The whole panel comes up at its default width and distance each time it is brought up
@@ -2583,11 +2615,21 @@ void LLViewerVR::updateKeyboard()
         placeAlong(eyes, ahead, mKeyboardAhead, 0.f, 0.f, mKeyboardCentre, mKeyboardRot);
         float slope[3];
         rotate(mKeyboardRot, UP, slope);
-        const F32 raise = KEYBOARD_RAISE * mKeyboardWidth * LLVRKeyboard::HEIGHT / LLVRKeyboard::WIDTH;
+        const F32 height = mKeyboardWidth * LLVRKeyboard::HEIGHT / LLVRKeyboard::WIDTH;
+        LLVector3 to_eyes;
         for (S32 i = 0; i < 3; ++i)
         {
-            mKeyboardCentre[i] += slope[i] * raise;
+            mKeyboardCentre[i] += slope[i] * KEYBOARD_RAISE * height;
+            to_eyes.mV[i] = eyes[i] - mKeyboardCentre[i];
         }
+        to_eyes.normalize();
+        for (S32 i = 0; i < 3; ++i)
+        {
+            mKeyboardCentre[i] += to_eyes.mV[i] * KEYBOARD_NEARER * height;
+        }
+        float lean[3];
+        direction(headingOf(ahead), -KEYBOARD_LEAN, lean);
+        facing(lean, mKeyboardRot);
     }
     mKeyboardShown = true;
     mKeyboard.update();
@@ -2673,6 +2715,14 @@ void LLViewerVR::showSettings()
         {
             placePanel(settings);
         }
+    }
+    else if (LLFloater* chat = settings ? chatFloater() : nullptr)
+    {
+        // On the whole panel, once as it opens: beside the conversation window, not over it.
+        const LLRect c = chat->calcScreenRect();
+        S32 x = 0, y = 0;
+        gFloaterView->screenPointToLocal(c.mRight + 4, c.mBottom, &x, &y);
+        settings->setOrigin(x, y);
     }
 }
 

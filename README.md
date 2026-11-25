@@ -69,7 +69,7 @@ This repository holds **source code only**. No builds are published here.
 ### Interface
 - The full viewer UI on a panel. It can be curved round you where the runtime supports
   cylinder layers, and it keeps the size and distance you last gave it. It can optionally
-  glide back into view when you turn away.
+  glide back into view when you turn away, not before you look past its edges.
 - A laser pointer on each hand. Trigger and grip act as the left and right mouse buttons,
   double-click works, and the laser colour and opacity can be set.
 - Haptic ticks as the laser crosses keys and buttons, and a firmer pulse on press.
@@ -82,8 +82,8 @@ This repository holds **source code only**. No builds are published here.
 - With the panel hidden or only the chat shown, the windows you open, alerts from the grid
   (a refused teleport, an ejection) and questions from objects (an attach request) still
   come up in front of you, square on to your eyes, and the keyboard works in them. With the
-  chat shown, script dialogs and alerts stack just above the conversation window and move
-  with it. Script dialogs come up only from the object you touched, not from a shop greeting
+  chat shown, script dialogs and alerts stack just above the conversation window (or beside
+  it when there is no room above) and move with it. Script dialogs come up only from the object you touched, not from a shop greeting
   you as you arrive.
 - A left-handed mode that swaps the controllers.
 - Your real controllers in your hands: Meta Quest Touch Plus models, textured, from Meta's
@@ -190,6 +190,7 @@ the headset before the next one builds on it.
 
 | Version | What it added |
 | --- | --- |
+| 0.6.7 | Keyboard nearer and more upright, dialogs beside the chat when there is no room above, settings beside the chat on the full panel, the panel follows only once you look past its edge |
 | 0.6.6 | Dialogs and alerts stack above the chat window, shop dialogs stay out of the hidden panel, windows on a hidden panel follow you, the keyboard sits higher, a wider default panel distance, swipe typing that leaves quick presses alone |
 | 0.6.5 | Alerts and object questions over a hidden panel, menus and dialogs square on to the eyes, keyboard in windows opened over a hidden panel, settings alone from the keyboard too |
 | 0.6.4 | Keyboard comes up on text fields again, windows carried round you by their title bar, panel follows sooner, longer teleport, settings alone from the wrist menu |
