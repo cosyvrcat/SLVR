@@ -178,29 +178,54 @@ namespace
         out[3] = cy * cp;
     }
 
-    // Puts a quad `distance` metres along `look` (a unit vector) from the eyes (tracking
-    // space), square on to it, with the point `dx`, `dy` metres from its middle (in its own
-    // plane, right and up) on that line.
-    void placeAlong(const float eyes[3], const float look[3], F32 distance, F32 dx, F32 dy, float centre[3], float rot[4])
+    // The point `dx`, `dy` metres from a panel's middle, right and up along its face (along
+    // the arc when it is bent round `radius`, as hitCylinder() has it; flat for 0).
+    void panelPoint(const float centre[3], const float rot[4], F32 radius, F32 dx, F32 dy, float out[3])
     {
-        const float RIGHT[3] = { 1.f, 0.f, 0.f }, UP[3] = { 0.f, 1.f, 0.f };
-        float right[3], up[3];
-        facing(look, rot);
-        rotate(rot, RIGHT, right);
-        rotate(rot, UP, up);
+        const F32 a = radius > 0.f ? dx / radius : 0.f;
+        const float local[3] = { radius > 0.f ? radius * sinf(a) : dx, dy, radius > 0.f ? radius * (1.f - cosf(a)) : 0.f };
+        rotate(rot, local, out);
         for (S32 i = 0; i < 3; ++i)
         {
-            centre[i] = eyes[i] + look[i] * distance - right[i] * dx - up[i] * dy;
+            out[i] += centre[i];
+        }
+    }
+
+    // Puts a quad `distance` metres along `look` (a unit vector) from the eyes (tracking
+    // space), with the point `dx`, `dy` metres from its middle (see panelPoint()) on that
+    // line and square on to it. Bent round `radius`, the quad is also turned about its own up
+    // axis by the arc's angle to that point: placed flat and then bent, a window off the
+    // middle was turned aside by that angle (pie menus and dialogs seen at a slant).
+    void placeAlong(const float eyes[3], const float look[3], F32 distance, F32 dx, F32 dy, float centre[3], float rot[4],
+                    F32 radius = 0.f)
+    {
+        facing(look, rot);
+        if (radius > 0.f)
+        {
+            const F32 s = sinf(dx / radius / 2.f), c = cosf(dx / radius / 2.f); // rot = rot * (turn about +Y)
+            const float a[4] = { rot[0], rot[1], rot[2], rot[3] };
+            rot[0] = a[0] * c - a[2] * s;
+            rot[1] = a[3] * s + a[1] * c;
+            rot[2] = a[0] * s + a[2] * c;
+            rot[3] = a[3] * c - a[1] * s;
+        }
+        const float ORIGIN[3] = { 0.f, 0.f, 0.f };
+        float offset[3];
+        panelPoint(ORIGIN, rot, radius, dx, dy, offset);
+        for (S32 i = 0; i < 3; ++i)
+        {
+            centre[i] = eyes[i] + look[i] * distance - offset[i];
         }
     }
 
     // The same along the line of sight.
-    void placeAhead(const float eyes[3], const float eye_rot[4], F32 distance, F32 dx, F32 dy, float centre[3], float rot[4])
+    void placeAhead(const float eyes[3], const float eye_rot[4], F32 distance, F32 dx, F32 dy, float centre[3], float rot[4],
+                    F32 radius = 0.f)
     {
         const float FORWARD[3] = { 0.f, 0.f, -1.f };
         float look[3];
         rotate(eye_rot, FORWARD, look);
-        placeAlong(eyes, look, distance, dx, dy, centre, rot);
+        placeAlong(eyes, look, distance, dx, dy, centre, rot, radius);
     }
 
     // Heading and pitch of a direction in tracking space (not necessarily a unit vector), and back.
@@ -309,8 +334,9 @@ namespace
     // Wrist menu: an image of 2 x 3 buttons over the other hand, while its face is turned to the eyes.
     const S32 WRIST_WIDTH = 480, WRIST_HEIGHT = 360; // image pixels
     const F32 WRIST_SIZE = 0.15f;                     // metres wide
-    const F32 WRIST_SEEN = 35.f * DEG_TO_RAD, WRIST_KEPT = 50.f * DEG_TO_RAD; // off the line of sight to show it, and to keep it
-    const F32 WRIST_FACING = 0.55f, WRIST_STILL_FACING = 0.25f; // how squarely its face is turned to the eyes, the same two
+    // (Sinan: at 35 degrees and 0.55 it came up as the hand rested; it should take a lift.)
+    const F32 WRIST_SEEN = 25.f * DEG_TO_RAD, WRIST_KEPT = 50.f * DEG_TO_RAD; // off the line of sight to show it, and to keep it
+    const F32 WRIST_FACING = 0.65f, WRIST_STILL_FACING = 0.25f; // how squarely its face is turned to the eyes, the same two
     const F32 WRIST_REACH = 0.8f;                     // metres from the eyes
     const S32 WRIST_ITEMS = 6;
     const char* const WRIST_TEXTS[WRIST_ITEMS] = { "wrist_panel", "wrist_chat", "wrist_settings", "wrist_screenshot", "wrist_recenter", "wrist_fly" };
@@ -912,7 +938,7 @@ void LLViewerVR::updatePointer()
         }
         const F32 pitch = llclamp(pitchOf(point) + mTitleDragPitch, -80.f * DEG_TO_RAD, 80.f * DEG_TO_RAD);
         direction(headingOf(point) + mTitleDragHeading, pitch, look);
-        placeAlong(eyes, look, mTitleDragDistance, mTitleDragX, mTitleDragY, mPanelCentre, mPanelRot);
+        placeAlong(eyes, look, mTitleDragDistance, mTitleDragX, mTitleDragY, mPanelCentre, mPanelRot, panelRadius());
         mLaserLength = mTitleDragAlong;
         mKeyboardHit[0] = LLVRKeyboard::Hit();
         return;
@@ -1128,6 +1154,20 @@ void LLViewerVR::checkPlacement()
     llassert_always(hitQuad(centre, rot, width, height, image_width, image_height, eyes, look, x, y, along));
     llassert_always(abs(x - window_x) <= 1 && abs(y - window_y) <= 1 && fabsf(along - 1.2f) < 1e-3f);
     llassert_always(fabsf(face[0] + look[0]) + fabsf(face[1] + look[1]) + fabsf(face[2] + look[2]) < 1e-4f);
+    // Bent round the eyes (and round a wider radius), the same; the window's own face, a
+    // step either side of its middle along the arc, is square on to the line of sight.
+    for (F32 radius : { 1.2f, 1.5f })
+    {
+        const F32 dx = ((F32)window_x / image_width - 0.5f) * width, dy = ((F32)window_y / image_height - 0.5f) * height;
+        placeAhead(eyes, eye_rot, 1.2f, dx, dy, centre, rot, radius);
+        llassert_always(hitCylinder(centre, rot, width, height, radius, image_width, image_height, eyes, look, x, y, along));
+        llassert_always(abs(x - window_x) <= 1 && abs(y - window_y) <= 1 && fabsf(along - 1.2f) < 1e-3f);
+        float left[3], right[3];
+        panelPoint(centre, rot, radius, dx - 0.01f, dy, left);
+        panelPoint(centre, rot, radius, dx + 0.01f, dy, right);
+        const F32 dot = (right[0] - left[0]) * look[0] + (right[1] - left[1]) * look[1] + (right[2] - left[2]) * look[2];
+        llassert_always(fabsf(dot) < 1e-4f);
+    }
 }
 
 // hitQuad() for the quad bent round a cylinder as LLVRBackend::endUI() bends it: the axis
@@ -1424,7 +1464,7 @@ void LLViewerVR::followPanel()
 {
     static LLCachedControl<bool> follow(gSavedSettings, "SLVRPanelFollow", false);
     // On a hidden panel, the windows shown on it follow too (the settings did not).
-    const LLFloater* popped = !mPanelVisible && !mPopped.empty() ? mPopped.back().get() : nullptr;
+    const LLFloater* popped = !mPanelVisible ? poppedAnchor() : nullptr;
     if (!follow || !(mPanelVisible || popped) || mGrabbing || mTitleDrag || mEye < 0)
     {
         mPanelFollowing = false;
@@ -1435,23 +1475,21 @@ void LLViewerVR::followPanel()
     // window shown on it.
     F32 dx = 0.f, dy = 0.f;
     windowOffset(mChatOnly ? chatFloater() : popped, dx, dy);
-    const float FORWARD[3] = { 0.f, 0.f, -1.f }, RIGHT[3] = { 1.f, 0.f, 0.f }, UP[3] = { 0.f, 1.f, 0.f };
-    float eyes[3], look[3], centre[3], rot[4], right[3], up[3];
-    rotate(mPanelRot, RIGHT, right);
-    rotate(mPanelRot, UP, up);
+    const float FORWARD[3] = { 0.f, 0.f, -1.f };
+    const F32 radius = panelRadius();
+    float eyes[3], look[3], centre[3], rot[4], seen[3];
     for (S32 i = 0; i < 3; ++i)
     {
         eyes[i] = (mEyes[0].pos[i] + mEyes[1].pos[i]) / 2.f;
     }
     rotate(mEyes[0].rot, FORWARD, look);
-    LLVector3 to_panel(mPanelCentre[0] + right[0] * dx + up[0] * dy - eyes[0], mPanelCentre[1] + right[1] * dx + up[1] * dy - eyes[1],
-                       mPanelCentre[2] + right[2] * dx + up[2] * dy - eyes[2]);
+    panelPoint(mPanelCentre, mPanelRot, radius, dx, dy, seen);
+    LLVector3 to_panel(seen[0] - eyes[0], seen[1] - eyes[1], seen[2] - eyes[2]);
     to_panel.normalize();
     const F32 cosine = to_panel.mV[0] * look[0] + to_panel.mV[1] * look[1] + to_panel.mV[2] * look[2];
     F32 away = PANEL_FOLLOW_AWAY;
     if (mPanelVisible && !mChatOnly)
     {
-        const F32 radius = panelRadius();
         const F32 half = radius > 0.f ? mPanelWidth / (2.f * radius) : atanf(mPanelWidth / (2.f * mPanelDistance));
         away = llclamp(half + PANEL_FOLLOW_PAST_EDGE, PANEL_FOLLOW_AWAY, F_PI_BY_TWO);
     }
@@ -1463,7 +1501,7 @@ void LLViewerVR::followPanel()
     {
         return;
     }
-    placeAhead(eyes, mEyes[0].rot, mPanelDistance, dx, dy, centre, rot);
+    placeAhead(eyes, mEyes[0].rot, mPanelDistance, dx, dy, centre, rot, radius);
     const F32 share = lowPass(PANEL_FOLLOW_RATE, llmin((F32)gFrameIntervalSeconds, 0.1f));
     const F32 same_way = mPanelRot[0] * rot[0] + mPanelRot[1] * rot[1] + mPanelRot[2] * rot[2] + mPanelRot[3] * rot[3] < 0.f ? -1.f : 1.f;
     F32 length = 0.f;
@@ -1813,6 +1851,7 @@ void LLViewerVR::pressWrist()
         // button): placed anew, the conversation window jumped aside to its spot on the panel.
         if (!mPanelVisible)
         {
+            centrePopped();
             resetPanelSize();
             placePanel(nullptr);
         }
@@ -1913,12 +1952,11 @@ bool LLViewerVR::measureHeight(F32& body_height)
 
 F32 LLViewerVR::panelRadius() const
 {
-    // Bent round the eyes at its distance; not past a half turn, however near and wide. Only
-    // the whole panel: a window shown alone is put square on to the eyes as on a flat panel
-    // (placePanel()), and bent with the panel it was turned aside by as much as it lay off
-    // the panel's middle (pie menus and script dialogs seen at a slant).
+    // Bent round the eyes at its distance; not past a half turn, however near and wide. In
+    // every mode (Sinan: set curved, a flat window means nothing): a window shown alone stays
+    // square on to the eyes, the panel being turned round the eyes to it (placeAlong()).
     static LLCachedControl<bool> curved(gSavedSettings, "SLVRCurvedPanel", true);
-    return curved && mBackend.canCurve() && mPanelVisible && !mChatOnly ? llmax(mPanelDistance, mPanelWidth / 3.f) : 0.f;
+    return curved && mBackend.canCurve() ? llmax(mPanelDistance, mPanelWidth / 3.f) : 0.f;
 }
 
 // Draws the HUD attachments and the flat UI into the panel image instead of the window.
@@ -2136,9 +2174,12 @@ void LLViewerVR::updatePopped()
             if ((notice || (asked && (!dialog || fromTouched(dialog)))) && opened && !isPopped(floater) && !(mChatOnly && isChatFloater(floater)))
             {
                 mPopped.push_back(floater->getHandle());
-                if (!mChatOnly) // with the chat they go round it, see arrangePopped()
+                // Where the user looks, not at the window's corner of the panel. With the chat,
+                // and a notice on a hidden panel, round the window already in front: see
+                // arrangePopped() (the screenshot's notice threw a conversation aside).
+                if (!mChatOnly && poppedAnchor() == floater)
                 {
-                    placePanel(floater); // where the user looks, not at the window's corner of the panel
+                    placePanel(floater);
                 }
             }
         }
@@ -2148,67 +2189,177 @@ void LLViewerVR::updatePopped()
     mFocusBefore = focus;
 }
 
-// With the chat alone, the windows shown with it go round the conversation window, so they
-// move with it (the chat window is what follows the eyes) and do not cover it or push it
-// aside: script dialogs right above it, notices above those (the newest on top), anything
-// else (the settings) to its right. Each frame: notices are moved by their channel too.
-// shortcut: a tall stack runs out of the top of the image; trim it if that happens.
+// The window a hidden panel is placed around and follows with: the newest shown on it that
+// is not a notice, or else the oldest notice. Notices go round it (arrangePopped()).
+LLFloater* LLViewerVR::poppedAnchor() const
+{
+    LLFloater* notice = nullptr;
+    for (auto it = mPopped.rbegin(); it != mPopped.rend(); ++it)
+    {
+        LLFloater* floater = it->get();
+        if (floater && !dynamic_cast<LLNotificationsUI::LLToast*>(floater))
+        {
+            return floater;
+        }
+        notice = floater ? floater : notice;
+    }
+    return notice;
+}
+
+// The windows shown with the chat alone, or on a hidden panel, go round the window the panel
+// is placed around (the conversation window; on a hidden panel poppedAnchor()), so they move
+// with it and do not cover it or push it aside: script dialogs (with the chat) right above
+// it, notices above those (the newest on top), anything else (the settings) to its right.
+// Above it when the two fit in the image's height, else beside it, up from its bottom. None
+// of them is cut off at the image's edge (Sinan): where they do not fit, the anchor moves
+// over on the panel and the panel the other way, so it stays where it is seen (moveShown()).
+// Each frame: notices are moved by their channel too.
+// shortcut: a column taller than the image is still cut at its top; trim it if that happens.
 void LLViewerVR::arrangePopped()
 {
-    LLFloater* chat = chatFloater();
-    if (!mChatOnly || !chat)
+    LLFloater* anchor = mChatOnly ? chatFloater() : mPanelVisible ? nullptr : poppedAnchor();
+    if (!anchor)
     {
         return;
     }
     const S32 GAP = 4;
-    const LLRect c = chat->calcScreenRect(); // UI units
-    // The dialogs and notices go up in a column from the chat's top, or, when that would run
-    // out of the top of the image (and be cut off), from its bottom on its right.
-    S32 column_height = 0, column_width = 0;
-    for (const LLHandle<LLFloater>& handle : mPopped)
-    {
-        const LLFloater* floater = handle.get();
-        if (floater && (dynamic_cast<const LLScriptFloater*>(floater) || dynamic_cast<const LLNotificationsUI::LLToast*>(floater)))
-        {
-            column_height += GAP + floater->getRect().getHeight();
-            column_width = llmax(column_width, GAP + floater->getRect().getWidth());
-        }
-    }
-    const S32 top = gFloaterView->calcScreenRect().mTop;
-    const bool beside = c.mTop + column_height > top;
-    const S32 column_left = beside ? c.mRight + GAP : c.mLeft;
-    S32 above = beside ? llmin(c.mBottom - GAP, top - column_height) : c.mTop;
-    S32 right = beside ? c.mRight + column_width : c.mRight;
-    for (S32 pass = 0; pass < 2; ++pass) // the dialogs first, nearest the chat
+    std::vector<LLFloater*> column, others; // bottom up; left to right
+    for (S32 pass = 0; pass < 2; ++pass) // the dialogs first, nearest the anchor
     {
         for (const LLHandle<LLFloater>& handle : mPopped)
         {
             LLFloater* floater = handle.get();
-            if (!floater || floater == chat) // a conversation popped on a hidden panel stays put
+            if (!floater || floater == anchor) // a conversation popped on a hidden panel stays put
             {
                 continue;
             }
-            const bool dialog = dynamic_cast<LLScriptFloater*>(floater) != nullptr;
+            const bool dialog = mChatOnly && dynamic_cast<LLScriptFloater*>(floater) != nullptr;
             const bool notice = dynamic_cast<LLNotificationsUI::LLToast*>(floater) != nullptr;
-            S32 x = 0, y = 0;
             if (pass == 0 ? dialog : notice)
             {
-                gFloaterView->screenPointToLocal(column_left, above + GAP, &x, &y);
-                above += GAP + floater->getRect().getHeight();
+                column.push_back(floater);
             }
-            else if (pass == 1 && !dialog && !notice)
+            else if (pass == 1 && mChatOnly && !dialog && !notice)
             {
-                gFloaterView->screenPointToLocal(right + GAP, c.mBottom, &x, &y);
-                right += GAP + floater->getRect().getWidth();
+                others.push_back(floater);
             }
-            else
-            {
-                continue;
-            }
-            if (floater->getRect().mLeft != x || floater->getRect().mBottom != y)
-            {
-                floater->setOrigin(x, y);
-            }
+        }
+    }
+    S32 column_height = 0, column_width = 0, others_width = 0, others_height = 0;
+    for (const LLFloater* floater : column)
+    {
+        column_height += GAP + floater->getRect().getHeight();
+        column_width = llmax(column_width, GAP + floater->getRect().getWidth());
+    }
+    for (const LLFloater* floater : others)
+    {
+        others_width += GAP + floater->getRect().getWidth();
+        others_height = llmax(others_height, floater->getRect().getHeight());
+    }
+    const LLRect view = gFloaterView->calcScreenRect(); // UI units
+    LLRect c = anchor->calcScreenRect();
+    const bool beside = c.getHeight() + column_height > view.getHeight();
+    // The column's bottom: right above the anchor, or beside it from its bottom, but low
+    // enough to end in the image.
+    auto column_bottom = [&]() { return beside ? llmax(view.mBottom, llmin(c.mBottom, view.mTop - column_height + GAP)) : c.mTop + GAP; };
+    LLRect group = c;
+    group.mTop = llmax(group.mTop, column_bottom() + column_height - GAP);
+    const S32 column_right = (beside ? c.mRight : c.mLeft) + column_width;
+    const S32 others_right = (beside ? c.mRight + column_width : c.mRight) + others_width;
+    group.mRight = llmax(c.mRight, llmax(column_right, others_right));
+    group.mTop = llmax(group.mTop, c.mBottom + others_height);
+    S32 sx = 0, sy = 0;
+    if (group.mRight > view.mRight)
+    {
+        sx = view.mRight - group.mRight;
+    }
+    if (group.mLeft + sx < view.mLeft)
+    {
+        sx = view.mLeft - group.mLeft;
+    }
+    if (group.mTop > view.mTop)
+    {
+        sy = view.mTop - group.mTop;
+    }
+    if (group.mBottom + sy < view.mBottom)
+    {
+        sy = view.mBottom - group.mBottom;
+    }
+    if (sx || sy)
+    {
+        moveShown(anchor, sx, sy);
+        c.translate(sx, sy);
+    }
+    auto put = [](LLFloater* floater, S32 left, S32 bottom)
+    {
+        S32 x = 0, y = 0;
+        gFloaterView->screenPointToLocal(left, bottom, &x, &y);
+        if (floater->getRect().mLeft != x || floater->getRect().mBottom != y)
+        {
+            floater->setOrigin(x, y);
+        }
+    };
+    S32 y = column_bottom();
+    for (LLFloater* floater : column)
+    {
+        put(floater, beside ? c.mRight + GAP : c.mLeft, y);
+        y += GAP + floater->getRect().getHeight();
+    }
+    S32 x = (beside ? c.mRight + column_width : c.mRight) + GAP;
+    for (LLFloater* floater : others)
+    {
+        put(floater, x, c.mBottom);
+        x += GAP + floater->getRect().getWidth();
+    }
+}
+
+// Moves a window shown alone on the panel (chat only, hidden) by `x`, `y` UI units, and the
+// panel the other way round the eyes, so the window stays where it is seen.
+void LLViewerVR::moveShown(LLFloater* floater, S32 x, S32 y)
+{
+    const F32 radius = panelRadius();
+    F32 dx = 0.f, dy = 0.f;
+    windowOffset(floater, dx, dy);
+    float seen[3], eyes[3], look[3];
+    panelPoint(mPanelCentre, mPanelRot, radius, dx, dy, seen);
+    for (S32 i = 0; i < 3; ++i)
+    {
+        eyes[i] = (mEyes[0].pos[i] + mEyes[1].pos[i]) / 2.f;
+        look[i] = seen[i] - eyes[i];
+    }
+    const F32 distance = sqrtf(look[0] * look[0] + look[1] * look[1] + look[2] * look[2]);
+    floater->translate(x, y);
+    if (distance < 0.01f)
+    {
+        return;
+    }
+    for (float& part : look)
+    {
+        part /= distance;
+    }
+    windowOffset(floater, dx, dy);
+    placeAlong(eyes, look, distance, dx, dy, mPanelCentre, mPanelRot, radius);
+}
+
+// From a hidden panel to the whole of it, which comes with its middle where the eyes look:
+// the windows shown on the hidden panel go to its middle, so they stay where they were seen
+// (Sinan: a chair's dialog went to the panel's top right corner, a conversation aside).
+void LLViewerVR::centrePopped()
+{
+    const LLFloater* anchor = poppedAnchor();
+    if (!anchor)
+    {
+        return;
+    }
+    const LLRect middle = gViewerWindow->getWindowRectScaled(), a = anchor->calcScreenRect();
+    const S32 x = middle.getCenterX() - a.getCenterX(), y = middle.getCenterY() - a.getCenterY();
+    for (const LLHandle<LLFloater>& handle : mPopped)
+    {
+        LLFloater* floater = handle.get();
+        if (floater && !dynamic_cast<LLNotificationsUI::LLToast*>(floater)) // notices go back to their channel
+        {
+            floater->translate(x, y);
+            gFloaterView->adjustToFitScreen(floater, false);
         }
     }
 }
@@ -2381,7 +2532,7 @@ void LLViewerVR::placePanel(const LLView* around)
     {
         eyes[i] = (mEyes[0].pos[i] + mEyes[1].pos[i]) / 2.f;
     }
-    placeAhead(eyes, mEyes[0].rot, mPanelDistance, dx, dy, mPanelCentre, mPanelRot);
+    placeAhead(eyes, mEyes[0].rot, mPanelDistance, dx, dy, mPanelCentre, mPanelRot, panelRadius());
     // Which window a jump of the panel was for (the chat seen thrown aside by a notice).
     LL_INFOS("VR") << "Panel placed around " << (around ? around->getName() : std::string("its middle")) << (mChatOnly ? ", chat only" : "")
                    << (mPanelVisible ? "" : ", hidden") << LL_ENDL;
@@ -2423,14 +2574,12 @@ bool LLViewerVR::startTitleDrag(LLView* title)
         return false;
     }
     windowOffset(window, mTitleDragX, mTitleDragY);
-    const float RIGHT[3] = { 1.f, 0.f, 0.f }, UP[3] = { 0.f, 1.f, 0.f };
-    float right[3], up[3], middle[3], point[3];
-    rotate(mPanelRot, RIGHT, right);
-    rotate(mPanelRot, UP, up);
+    float middle[3], point[3];
+    panelPoint(mPanelCentre, mPanelRot, panelRadius(), mTitleDragX, mTitleDragY, middle);
     for (S32 i = 0; i < 3; ++i)
     {
         const F32 eyes = (mEyes[0].pos[i] + mEyes[1].pos[i]) / 2.f;
-        middle[i] = mPanelCentre[i] + right[i] * mTitleDragX + up[i] * mTitleDragY - eyes;
+        middle[i] -= eyes;
         point[i] = mSteady.pos[i] + mSteady.dir[i] * mLaserLength - eyes;
     }
     mTitleDragHeading = headingChange(headingOf(point), headingOf(middle));
@@ -2730,10 +2879,22 @@ void LLViewerVR::settingsOpened(LLFloater* settings)
     else if (LLFloater* chat = chatFloater())
     {
         // On the whole panel, once as it opens: beside the conversation window, not over it.
-        const LLRect c = chat->calcScreenRect();
+        // With no room on its right, the conversation window moves left (Sinan: the settings
+        // were cut off at the panel's edge); what still does not fit goes over it.
+        const S32 GAP = 4;
+        const LLRect view = gFloaterView->calcScreenRect();
+        LLRect c = chat->calcScreenRect();
+        const S32 over = c.mRight + GAP + settings->getRect().getWidth() - view.mRight;
+        if (over > 0)
+        {
+            const S32 left = -llmin(over, llmax(c.mLeft - view.mLeft, 0));
+            chat->translate(left, 0);
+            c.translate(left, 0);
+        }
         S32 x = 0, y = 0;
-        gFloaterView->screenPointToLocal(c.mRight + 4, c.mBottom, &x, &y);
+        gFloaterView->screenPointToLocal(c.mRight + GAP, c.mBottom, &x, &y);
         settings->setOrigin(x, y);
+        gFloaterView->adjustToFitScreen(settings, false);
     }
 }
 
@@ -2790,6 +2951,7 @@ void LLViewerVR::applyInput()
     {
         if (!mPanelVisible)
         {
+            centrePopped();
             mPanelVisible = true;
             resetPanelSize();
             placePanel(nullptr);

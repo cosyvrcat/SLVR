@@ -131,7 +131,10 @@ private:
     void drawChatOnly();
     void updatePopped();
     bool isPopped(const LLFloater* floater) const;
+    LLFloater* poppedAnchor() const;
     void arrangePopped();
+    void moveShown(LLFloater* floater, S32 x, S32 y);
+    void centrePopped();
     void resetPanelSize();
     bool panelShown() const { return mPanelVisible || mMenuOnly || !mPopped.empty(); }
     void logZoom() const;
