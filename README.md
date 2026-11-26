@@ -68,12 +68,12 @@ This repository holds **source code only**. No builds are published here.
 
 ### Interface
 - The full viewer UI on a panel. It can be curved round you where the runtime supports
-  cylinder layers, and it keeps the size and distance you last gave it. It can optionally
+  cylinder layers (in every mode, the windows shown alone too), and it keeps the size and distance you last gave it. It can optionally
   glide back into view when you turn away, not before you look past its edges.
 - A laser pointer on each hand. Trigger and grip act as the left and right mouse buttons,
   double-click works, and the laser colour and opacity can be set.
 - Haptic ticks as the laser crosses keys and buttons, and a firmer pulse on press.
-- A wrist menu: look at your left controller for quick buttons (panel, chat, settings, photo,
+- A wrist menu: lift your left controller and look at it for quick buttons (panel, chat, settings, photo,
   recentre, fly / land / stand up).
 - A chat-only mode that shows just the conversation window where it was on the full panel,
   together with any open script dialogs. Drag a window by its title bar to move it anywhere
@@ -81,10 +81,12 @@ This repository holds **source code only**. No builds are published here.
 - Context and pie menus open where you look; a trigger press beside one closes it.
 - With the panel hidden or only the chat shown, the windows you open, alerts from the grid
   (a refused teleport, an ejection) and questions from objects (an attach request) still
-  come up in front of you, square on to your eyes, and the keyboard works in them. With the
-  chat shown, script dialogs and alerts stack just above the conversation window (or beside
-  it when there is no room above) and move with it. Script dialogs come up only from the object you touched, not from a shop greeting
-  you as you arrive.
+  come up in front of you, square on to your eyes, and the keyboard works in them. Alerts
+  stack just above the window in front of you (with the chat shown, script dialogs too, or
+  beside it when there is no room above) and move with it; nothing is cut off at the
+  panel's edge, the windows make room instead. Bringing up the full panel keeps those windows
+  in front of you. Script dialogs come up only from the object you touched, not from a shop
+  greeting you as you arrive.
 - A left-handed mode that swaps the controllers.
 - Your real controllers in your hands: Meta Quest Touch Plus models, textured, from Meta's
   own controller art (see [Controller models](#controller-models)). Without them, simple
@@ -130,7 +132,7 @@ button stays on the left.
 | **X** (hold) | Recentre |
 | **Y** | VR screenshot |
 | Menu button | Cycle: full panel, chat only, hidden |
-| Look at the left controller | Wrist menu |
+| Lift the left controller and look at it | Wrist menu |
 
 To switch VR on or off, use **World > VR Headset** or **Ctrl+Alt+F7**. All options are in
 **SLVR > SLVR Settings**.
@@ -191,6 +193,7 @@ the headset before the next one builds on it.
 
 | Version | What it added |
 | --- | --- |
+| 0.6.9 | Curved panel in every mode, no window cut off at the panel's edge, windows in front stay there when the full panel comes up, notices no longer push the window in front aside, wrist menu needs a lift |
 | 0.6.8 | Keyboard lower and a little more tilted, back at the distance you last dropped it; settings from the SLVR menu also open beside the chat |
 | 0.6.7 | Keyboard nearer and more upright, dialogs beside the chat when there is no room above, settings beside the chat on the full panel, the panel follows only once you look past its edge |
 | 0.6.6 | Dialogs and alerts stack above the chat window, shop dialogs stay out of the hidden panel, windows on a hidden panel follow you, the keyboard sits higher, a wider default panel distance, swipe typing that leaves quick presses alone |
