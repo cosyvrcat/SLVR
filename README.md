@@ -1,4 +1,4 @@
-<p align="center"><img src="doc/cosyvr/cover.jpg" alt="CosyVR Viewer: Second Life in virtual reality" width="100%"></p>
+<p align="center"><img src="doc/cosyvr/cover.jpg" alt="CosyVR Viewer: a cat in a VR headset relaxing on a beanbag, floating islands behind it" width="100%"></p>
 
 # CosyVR Viewer
 
