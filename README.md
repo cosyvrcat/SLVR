@@ -99,7 +99,10 @@ This repository holds **source code only**. No builds are published here.
   emoticons, a repeating backspace, shift and caps lock. It comes up when you press a text
   field, low in front of you and tilted back, so you can type with your arms resting, as far
   away as you last dragged it.
-- Word completion and next-word prediction, learned locally from your own chat logs.
+- Word completion and next-word prediction, learned locally from your chat logs (your own
+  lines count most), over a word list for the keyboard's language, as a phone keyboard
+  does: words you have never written are suggested and swiped too. Word lists for English,
+  Turkish, Danish, German, Spanish, French, Italian, Polish, Portuguese and Russian.
 - Swipe typing: hold the right trigger on the first letter and glide over the others; the
   word is typed as you let go, with a fading trail in your laser's colour behind the
   pointer. The next likeliest words are offered in its place. Quick presses always type
@@ -193,6 +196,7 @@ the headset before the next one builds on it.
 
 | Version | What it added |
 | --- | --- |
+| 0.6.11 | Keyboard word lists for 10 languages under what the chat logs teach, your own lines counting most |
 | 0.6.10 | Keyboard half a height higher and a little to the right, turned to face you |
 | 0.6.9 | Curved panel in every mode, no window cut off at the panel's edge, windows in front stay there when the full panel comes up, notices no longer push the window in front aside, wrist menu needs a lift |
 | 0.6.8 | Keyboard lower and a little more tilted, back at the distance you last dropped it; settings from the SLVR menu also open beside the chat |
@@ -222,6 +226,10 @@ Planned next: video recording in VR and voice dictation for the keyboard.
   rewritten for OpenXR.
 - Licensed under the GNU Lesser General Public License 2.1, like the viewer it is based on.
   See [LICENSE](LICENSE) and `doc/LICENSE-source.txt`.
+- The keyboard's word lists (`indra/newview/app_settings/slvr_words`) are cut from Hermit
+  Dave's [FrequencyWords](https://github.com/hermitdave/FrequencyWords) 2018 lists, built
+  from the OpenSubtitles corpus, under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/);
+  see the README there.
 
 SLVR follows Linden Lab's Third Party Viewer Policy. Second Life is a trademark of Linden
 Research, Inc. Meta Quest is a trademark of Meta Platforms, Inc. SLVR is not affiliated with
