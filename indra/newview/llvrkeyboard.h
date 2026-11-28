@@ -5,7 +5,8 @@
  * Draws itself into a fixed-size image and says what lies at a point of it; where the image
  * is placed and how the lasers reach it is up to LLViewerVR. Types into whatever text field
  * has the keyboard focus, like the real keyboard, and suggests word completions and the
- * next word, learned from the chat logs and from what is typed. The letters come from the
+ * next word, learned from the chat logs (the user's own lines most) and from what is typed,
+ * over the keyboard language's word list. The letters come from the
  * layout chosen in the SLVR settings (see llvrlanguage.h).
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
@@ -84,6 +85,9 @@ private:
     bool mLoadStarted = false;
     Learned mLog;           // from the chat logs, once loaded
     Learned mTyped;         // typed or picked on this keyboard, weighted higher
+    std::future<word_map_t> mDictionaryLoading;
+    word_map_t mDictionary;      // the keyboard language's word list: each word's rank, 0 the commonest
+    std::string mDictionaryCode; // whose it is
     LLWString mWord;        // the word before the text cursor, as typed
     std::string mPrevious;  // the word before that in the same sentence, lower case; or empty
     std::string mContext;   // what mSuggestions were worked out for

@@ -11,6 +11,9 @@
 
 #include "llvrkeyboard.h"
 
+#include "llagent.h"
+#include "llagentui.h"
+#include "llavatarnamecache.h"
 #include "lldir.h"
 #include "llfocusmgr.h"
 #include "llfontgl.h"
@@ -28,6 +31,7 @@
 #include <atomic>
 #include <filesystem>
 #include <fstream>
+#include <set>
 #include <vector>
 
 namespace
@@ -130,6 +134,14 @@ namespace
     const U32 TYPED_WEIGHT = 5;        // a word typed here counts as much as this many in the logs
     const U32 PAIR_WEIGHT = 10;        // and a word seen after the previous one as this many seen anywhere
     const U32 LOG_PAIR_MIN = 2;        // a pair seen fewer times in the logs is forgotten: most are chance
+    // The logs are mostly what others wrote (Sinan's: 87 percent); the user's own lines are
+    // what they will write again, as phone keyboards learn only from what is typed.
+    const U32 OWN_WEIGHT = 3;
+    // Under what the logs say, the keyboard language's word list (app_settings/slvr_words,
+    // most frequent first), as a phone keyboard's dictionary: words never seen in the logs
+    // are suggested and swiped too. Its first word counts as this many seen in others'
+    // lines, the DICTIONARY_HALF-th half that, the 1000th a tenth: below the user's own words.
+    const F32 DICTIONARY_WEIGHT = 2.f, DICTIONARY_HALF = 100.f;
 
     struct KeyBox { KeyDef def; LLRectf rect; };
 
@@ -244,8 +256,9 @@ namespace
         }
     }
 
-    // A chat log line's message: "[2026/11/20 21:03]  Name Resident: text" gives "text".
-    LLWString logMessage(const LLWString& line)
+    // A chat log line's message: "[2026/11/20 21:03]  Name Resident: text" gives "text", and
+    // `from` "Name Resident" (empty when the line names no one).
+    LLWString logMessage(const LLWString& line, LLWString* from = nullptr)
     {
         size_t start = 0;
         if (!line.empty() && line[0] == '[')
@@ -254,15 +267,83 @@ namespace
             start = close == LLWString::npos ? 0 : close + 1;
         }
         const size_t colon = line.find(':', start);
+        if (from)
+        {
+            from->clear();
+        }
         if (colon != LLWString::npos && colon - start < 64) // names are short; a later colon is the message's
         {
+            if (from)
+            {
+                *from = line.substr(start, colon - start);
+                LLWStringUtil::trim(*from);
+            }
             start = colon + 1;
         }
         return line.substr(start);
     }
 
-    // Worker thread: what the newest chat logs say, up to LOG_BUDGET bytes.
-    LLVRKeyboard::Learned loadLog(std::string dir)
+    F32 dictionaryWeight(U32 rank)
+    {
+        return DICTIONARY_WEIGHT * DICTIONARY_HALF / (DICTIONARY_HALF + (F32)rank);
+    }
+
+    // The names the user's own lines go by in the chat logs (LLIMModel::logToFile(): the
+    // complete name when a display name is set, else the legacy name; "Resident" left off),
+    // whichever of them the logs were written with.
+    std::set<std::string> ownNames()
+    {
+        std::set<std::string> names;
+        LLAvatarName av_name;
+        if (LLAvatarNameCache::get(gAgentID, &av_name))
+        {
+            for (const std::string& name : { av_name.getCompleteName(), av_name.getCompleteName(false), av_name.getDisplayName(),
+                                             av_name.getUserName(), av_name.getLegacyName() })
+            {
+                names.insert(name);
+            }
+        }
+        std::string full;
+        LLAgentUI::buildFullname(full);
+        names.insert(full);
+        const std::string RESIDENT = " Resident";
+        for (std::string name : std::set<std::string>(names))
+        {
+            if (name.size() > RESIDENT.size() && name.compare(name.size() - RESIDENT.size(), RESIDENT.size(), RESIDENT) == 0)
+            {
+                names.insert(name.substr(0, name.size() - RESIDENT.size()));
+            }
+        }
+        names.erase(std::string());
+        return names;
+    }
+
+    // Worker thread: a language's word list, one word a line, most frequent first: each
+    // word's rank.
+    LLVRKeyboard::word_map_t loadDictionary(std::string path)
+    {
+        LLVRKeyboard::word_map_t words;
+        std::ifstream file(std::filesystem::path(ll_convert_string_to_wide(path)), std::ios::binary);
+        std::string line;
+        U32 rank = 0;
+        while (std::getline(file, line))
+        {
+            if (!line.empty() && line.back() == '\r')
+            {
+                line.pop_back();
+            }
+            if (!line.empty())
+            {
+                words.emplace(line, rank++);
+            }
+        }
+        LL_INFOS("VR") << "Word list " << path << ": " << words.size() << " words" << LL_ENDL;
+        return words;
+    }
+
+    // Worker thread: what the newest chat logs say, up to LOG_BUDGET bytes; the lines from
+    // one of `own` count OWN_WEIGHT times.
+    LLVRKeyboard::Learned loadLog(std::string dir, std::set<std::string> own)
     {
         namespace fs = std::filesystem;
         LLVRKeyboard::Learned learned;
@@ -290,7 +371,9 @@ namespace
             {
                 size_t line_end = text.find('\n', line_start);
                 line_end = line_end == std::string::npos ? text.size() : line_end;
-                countText(logMessage(utf8str_to_wstring(text.substr(line_start, line_end - line_start))), learned, 1);
+                LLWString from;
+                const LLWString message = logMessage(utf8str_to_wstring(text.substr(line_start, line_end - line_start)), &from);
+                countText(message, learned, own.count(wstring_to_utf8str(from)) ? OWN_WEIGHT : 1);
                 line_start = line_end + 1;
             }
             if (budget == 0)
@@ -768,6 +851,10 @@ S32 LLVRKeyboard::swipeWords(const std::vector<LLVector2>& path, LLWString out[3
                        { seen[key.substr(prefix.size())] += (F32)(count * weight * PAIR_WEIGHT); });
         }
     }
+    for (const auto& word : mDictionary)
+    {
+        seen[word.first] += dictionaryWeight(word.second);
+    }
 
     std::vector<std::pair<F32, LLWString>> ranked;
     for (const auto& entry : seen)
@@ -937,11 +1024,24 @@ void LLVRKeyboard::update()
     if ((suggest || swipe) && !mLoadStarted) // swipe typing finds its words there too
     {
         const std::string dir = gDirUtilp->getPerAccountChatLogsDir();
-        if (!dir.empty()) // empty until logged in
+        const std::set<std::string> own = ownNames();
+        if (!dir.empty() && !own.empty()) // empty until logged in
         {
             mLoadStarted = true;
-            mLoading = std::async(std::launch::async, loadLog, dir);
+            mLoading = std::async(std::launch::async, loadLog, dir, own);
         }
+    }
+    const std::string language = LLVRLanguage::keyboard().code;
+    if ((suggest || swipe) && language != mDictionaryCode && !mDictionaryLoading.valid()) // again when the layout changes
+    {
+        mDictionaryCode = language;
+        mDictionaryLoading = std::async(std::launch::async, loadDictionary,
+                                        gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, "slvr_words", language + ".txt"));
+    }
+    if (mDictionaryLoading.valid() && mDictionaryLoading.wait_for(std::chrono::seconds(0)) == std::future_status::ready)
+    {
+        mDictionary = mDictionaryLoading.get();
+        mContext.clear();
     }
     if (mLoading.valid() && mLoading.wait_for(std::chrono::seconds(0)) == std::future_status::ready)
     {
@@ -1018,23 +1118,28 @@ void LLVRKeyboard::refreshSuggestions()
     {
         return;
     }
-    std::map<std::string, U32> scores;
+    std::map<std::string, F32> scores;
     for (const Learned* learned : { &mLog, &mTyped })
     {
         const U32 weight = learned == &mTyped ? TYPED_WEIGHT : 1;
         if (!word.empty())
         {
             withPrefix(learned->words, word, [&](const std::string& key, U32 count)
-                       { if (key.size() > word.size()) scores[key] += count * weight; });
+                       { if (key.size() > word.size()) scores[key] += (F32)(count * weight); });
         }
         if (!mPrevious.empty())
         {
             const std::string prefix = mPrevious + ' ';
             withPrefix(learned->pairs, prefix + word, [&](const std::string& key, U32 count)
-                       { if (key.size() > prefix.size() + word.size()) scores[key.substr(prefix.size())] += count * weight * PAIR_WEIGHT; });
+                       { if (key.size() > prefix.size() + word.size()) scores[key.substr(prefix.size())] += (F32)(count * weight * PAIR_WEIGHT); });
         }
     }
-    std::vector<std::pair<U32, std::string>> ranked;
+    if (!word.empty())
+    {
+        withPrefix(mDictionary, word, [&](const std::string& key, U32 rank)
+                   { if (key.size() > word.size()) scores[key] += dictionaryWeight(rank); });
+    }
+    std::vector<std::pair<F32, std::string>> ranked;
     for (const auto& score : scores)
     {
         ranked.emplace_back(score.second, score.first);
@@ -1095,7 +1200,13 @@ void LLVRKeyboard::selfCheck()
     llassert_always(isLetter(0x259) && isLetter(0x44F) && !isLetter('3') && !isLetter(','));
     sTurkic = turkic;
     Learned learned;
-    countText(logMessage(utf8str_to_wstring("[2026/11/20 21:03]  Ali Resident: Merhaba, merhaba d\xC3\xBCnya! a")), learned, 1);
+    LLWString from;
+    countText(logMessage(utf8str_to_wstring("[2026/11/20 21:03]  Ali Resident: Merhaba, merhaba d\xC3\xBCnya! a"), &from), learned, 1);
+    llassert_always(wstring_to_utf8str(from) == "Ali Resident");
+    logMessage(utf8str_to_wstring("[2026/11/20 21:03]  Second Life closed the door"), &from);
+    llassert_always(from.empty());
+    // One of the user's own words outweighs the language's commonest word in the word list.
+    llassert_always(dictionaryWeight(0) < OWN_WEIGHT && dictionaryWeight(1000) < dictionaryWeight(999));
     llassert_always(learned.words.size() == 2 && learned.words["merhaba"] == 2 && learned.words["d\xC3\xBCnya"] == 1);
     llassert_always(learned.pairs.size() == 2 && learned.pairs["merhaba merhaba"] == 1 && learned.pairs["merhaba d\xC3\xBCnya"] == 1);
 
@@ -1114,6 +1225,12 @@ void LLVRKeyboard::selfCheck()
     keyboard.mWord = utf8str_to_wstring("Mer");
     keyboard.refreshSuggestions();
     llassert_always(wstring_to_utf8str(keyboard.mSuggestions[0]) == "Merhem" && wstring_to_utf8str(keyboard.mSuggestions[1]) == "Merhaba");
+    // The word list fills in after them, its commoner word first.
+    keyboard.mDictionary = { { "mercimek", 5000 }, { "merkez", 40 }, { "merhem", 0 } };
+    keyboard.refreshSuggestions();
+    llassert_always(wstring_to_utf8str(keyboard.mSuggestions[0]) == "Merhem" && wstring_to_utf8str(keyboard.mSuggestions[1]) == "Merhaba"
+                    && wstring_to_utf8str(keyboard.mSuggestions[2]) == "Merkez");
+    keyboard.mDictionary.clear();
 
     // The next word: what followed the previous one, before what is merely frequent.
     const std::string nasilsin = "nas\xC4\xB1ls\xC4\xB1n";

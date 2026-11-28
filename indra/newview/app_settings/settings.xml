@@ -18273,7 +18273,7 @@ Change of this parameter will affect the layout of buttons in notification toast
     <key>SLVRWordSuggestions</key>
     <map>
       <key>Comment</key>
-      <string>SLVR: the on-screen VR keyboard suggests word completions and the next word, learned from the chat logs</string>
+      <string>SLVR: the on-screen VR keyboard suggests word completions and the next word, learned from the chat logs (your own lines most), over the keyboard language's word list</string>
       <key>Persist</key>
       <integer>1</integer>
       <key>Type</key>
