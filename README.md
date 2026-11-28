@@ -199,6 +199,7 @@ the headset before the next one builds on it.
 
 | Version | What it added |
 | --- | --- |
+| 0.6.13 | New name: CosyVR Viewer. Settings, logs and VR controller models now live in `%APPDATA%\CosyVR_x64` |
 | 0.6.12 | Word suggestions learn only from your private messages, remember typing between logins, and can be forgotten from the settings |
 | 0.6.11 | Keyboard word lists for 10 languages under what the chat logs teach, your own lines counting most |
 | 0.6.10 | Keyboard half a height higher and a little to the right, turned to face you |
