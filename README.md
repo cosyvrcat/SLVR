@@ -2,7 +2,7 @@
 
 # CosyVR Viewer
 
-**Second Life in virtual reality.** CosyVR Viewer is a Second Life viewer with native OpenXR support,
+CosyVR Viewer is a Second Life viewer with native OpenXR support,
 built on the current Firestorm Viewer. Put on a headset and you see the world from your
 avatar's own eyes, in stereo and at true scale. You walk, fly, teleport and chat with your
 controllers, and the full viewer interface floats in front of you on a panel you can move.
