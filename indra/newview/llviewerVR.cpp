@@ -243,10 +243,12 @@ namespace
     // level, square on to the eyes, so it leans back like a laptop's keyboard.
     const F32 KEYBOARD_BELOW = 40.f * DEG_TO_RAD;
     // From there it goes this many of its own heights up its slope (Sinan: at 2 it covered the
-    // chat and the arms left the armrests), stays as far from the eyes as it was last dropped
-    // (SLVRKeyboardReach; a fixed step nearer on top of that brought it back nearer than
-    // dropped), and leans back only this far from upright (Sinan: some 75 degrees off the floor).
-    const F32 KEYBOARD_RAISE = 1.f;
+    // chat and the arms left the armrests, at 1 it sat half a height low) and this many of its
+    // widths to the right (Sinan: it sat a little to the left), stays as far from the eyes as
+    // it was last dropped (SLVRKeyboardReach; a fixed step nearer on top of that brought it
+    // back nearer than dropped), turned to face them, and leans back only this far from
+    // upright (Sinan: some 75 degrees off the floor).
+    const F32 KEYBOARD_RAISE = 1.5f, KEYBOARD_RIGHT = 0.25f;
     const F32 KEYBOARD_LEAN = 15.f * DEG_TO_RAD;
 
     // A notice that shows over a hidden panel or the chat alone, asked for or not: an alert or
@@ -2763,13 +2765,15 @@ void LLViewerVR::updateKeyboard()
             eyes[i] = (mEyes[0].pos[i] + mEyes[1].pos[i]) / 2.f;
         }
         placeAlong(eyes, ahead, mKeyboardAhead, 0.f, 0.f, mKeyboardCentre, mKeyboardRot);
-        float slope[3];
+        const float RIGHT[3] = { 1.f, 0.f, 0.f };
+        float slope[3], right[3];
         rotate(mKeyboardRot, UP, slope);
+        rotate(mKeyboardRot, RIGHT, right);
         const F32 height = mKeyboardWidth * LLVRKeyboard::HEIGHT / LLVRKeyboard::WIDTH;
         LLVector3 from_eyes;
         for (S32 i = 0; i < 3; ++i)
         {
-            mKeyboardCentre[i] += slope[i] * KEYBOARD_RAISE * height;
+            mKeyboardCentre[i] += slope[i] * KEYBOARD_RAISE * height + right[i] * KEYBOARD_RIGHT * mKeyboardWidth;
             from_eyes.mV[i] = mKeyboardCentre[i] - eyes[i];
         }
         from_eyes.normalize();
@@ -2778,7 +2782,7 @@ void LLViewerVR::updateKeyboard()
             mKeyboardCentre[i] = eyes[i] + from_eyes.mV[i] * mKeyboardAhead;
         }
         float lean[3];
-        direction(headingOf(ahead), -KEYBOARD_LEAN, lean);
+        direction(headingOf(from_eyes.mV), -KEYBOARD_LEAN, lean);
         facing(lean, mKeyboardRot);
     }
     mKeyboardShown = true;
