@@ -193,6 +193,7 @@ the headset before the next one builds on it.
 
 | Version | What it added |
 | --- | --- |
+| 0.6.10 | Keyboard half a height higher and a little to the right, turned to face you |
 | 0.6.9 | Curved panel in every mode, no window cut off at the panel's edge, windows in front stay there when the full panel comes up, notices no longer push the window in front aside, wrist menu needs a lift |
 | 0.6.8 | Keyboard lower and a little more tilted, back at the distance you last dropped it; settings from the SLVR menu also open beside the chat |
 | 0.6.7 | Keyboard nearer and more upright, dialogs beside the chat when there is no room above, settings beside the chat on the full panel, the panel follows only once you look past its edge |
