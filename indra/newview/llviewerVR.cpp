@@ -1,9 +1,9 @@
 /**
  * @file llviewerVR.cpp
- * @brief SLVR: stereo rendering of the viewer into a VR headset.
+ * @brief CosyVR: stereo rendering of the viewer into a VR headset.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
- * SLVR, based on the P373R VR Mod. LGPL 2.1, see LICENSE.
+ * CosyVR Viewer, based on the P373R VR Mod. LGPL 2.1, see LICENSE.
  * $/LicenseInfo$
  */
 
@@ -77,8 +77,8 @@ LLViewerVR gVR;
 namespace
 {
     // A controller's model, made from Meta's controller art by
-    // scripts/slvr/convert_controller_models.py into the user settings folder (the models are
-    // Meta's and not part of SLVR). Metres in the frame of the aim pose (x right, y up, -z
+    // scripts/cosyvr/convert_controller_models.py into the user settings folder (the models are
+    // Meta's and not part of CosyVR). Metres in the frame of the aim pose (x right, y up, -z
     // along the laser), triangles counter-clockwise seen from outside. Without one, a box.
     struct ControllerModel
     {
@@ -105,7 +105,7 @@ namespace
         }
         std::string magic, word;
         S32 version = 0, vertex_count = 0, triangle_count = 0;
-        bool ok = (file >> magic >> version >> word >> vertex_count) && magic == "slvr_controller" && version == 1
+        bool ok = (file >> magic >> version >> word >> vertex_count) && magic == "cosyvr_controller" && version == 1
                   && word == "vertices" && vertex_count > 0 && vertex_count < 200000;
         for (S32 i = 0; ok && i < vertex_count; ++i)
         {
@@ -245,7 +245,7 @@ namespace
     // From there it goes this many of its own heights up its slope (Sinan: at 2 it covered the
     // chat and the arms left the armrests, at 1 it sat half a height low) and this many of its
     // widths to the right (Sinan: it sat a little to the left), stays as far from the eyes as
-    // it was last dropped (SLVRKeyboardReach; a fixed step nearer on top of that brought it
+    // it was last dropped (CosyVRKeyboardReach; a fixed step nearer on top of that brought it
     // back nearer than dropped), turned to face them, and leans back only this far from
     // upright (Sinan: some 75 degrees off the floor).
     const F32 KEYBOARD_RAISE = 1.5f, KEYBOARD_RIGHT = 0.25f;
@@ -315,7 +315,7 @@ namespace
     const F32 POP_AFTER_PRESS = 5.f;
     const F32 MESSAGE_DOT_RADIUS = 0.012f; // metres, a metre ahead
 
-    const F32 SMOOTH_TURN_FASTEST = 240.f * DEG_TO_RAD; // the fastest SLVRSmoothTurnSpeed, radians per second
+    const F32 SMOOTH_TURN_FASTEST = 240.f * DEG_TO_RAD; // the fastest CosyVRSmoothTurnSpeed, radians per second
     const F32 STICK_ON = 0.6f;       // a thumbstick counts as pushed beyond this
     // The left stick walks pushed past WALK_ON, and runs held all the way for RUN_HOLD seconds:
     // at 0.9 without a wait a slight push already ran.
@@ -347,7 +347,7 @@ namespace
         const S32 w = WRIST_WIDTH / 2, h = WRIST_HEIGHT / 3, col = item % 2, row = item / 2;
         return LLRect(col * w + 8, WRIST_HEIGHT - row * h - 8, (col + 1) * w - 8, WRIST_HEIGHT - (row + 1) * h + 8);
     }
-    // SLVRPanelFollow: the panel glides back once the eyes are this far off it, until it is this near.
+    // CosyVRPanelFollow: the panel glides back once the eyes are this far off it, until it is this near.
     // The whole panel: no sooner than this far past its own edge, so its edges and corners can
     // be looked at however near and wide it is (it followed the eyes onto its top menus).
     const F32 PANEL_FOLLOW_AWAY = 40.f * DEG_TO_RAD, PANEL_FOLLOW_NEAR = 3.f * DEG_TO_RAD;
@@ -356,17 +356,17 @@ namespace
 
     F32 snapTurn()
     {
-        static LLCachedControl<S32> degrees(gSavedSettings, "SLVRSnapAngle", 30);
+        static LLCachedControl<S32> degrees(gSavedSettings, "CosyVRSnapAngle", 30);
         return llclamp((S32)degrees, 5, 180) * DEG_TO_RAD;
     }
 
     F32 smoothTurnRate() // at full stick
     {
-        static LLCachedControl<F32> degrees(gSavedSettings, "SLVRSmoothTurnSpeed", 120.f);
+        static LLCachedControl<F32> degrees(gSavedSettings, "CosyVRSmoothTurnSpeed", 120.f);
         return llclamp((F32)degrees * DEG_TO_RAD, 10.f * DEG_TO_RAD, SMOOTH_TURN_FASTEST);
     }
 
-    // SLVRLeftHanded: the left hand points and clicks, the right one walks; the menu button,
+    // CosyVRLeftHanded: the left hand points and clicks, the right one walks; the menu button,
     // which only the left controller has, stays.
     void swapHands(LLVRInput& in)
     {
@@ -397,7 +397,7 @@ namespace
     }
     const F32 STICK_OFF = 0.3f;      // and as let go below this
     const F32 LASER_LENGTH = 20.f;   // drawn length when it hits nothing
-    const F32 LASER_MIN_OPACITY = 0.1f; // SLVRLaserOpacity never hides the laser altogether
+    const F32 LASER_MIN_OPACITY = 0.1f; // CosyVRLaserOpacity never hides the laser altogether
     const F32 PICK_DISTANCE = 512.f; // as far as the mouse picks
     const F32 FLY_HOLD = 0.5f;       // seconds the right stick is held up before flying starts
     const F32 ZOOM_RATE = 1.5f;      // zoom e-foldings, and orbit radians, per second at full stick
@@ -421,7 +421,7 @@ namespace
         return 1.f - expf(-dt * F_TWO_PI * cutoff);
     }
 
-    // Comfort vignette, SLVRVignette 1 to 3 (low to high): the angle off the line of sight
+    // Comfort vignette, CosyVRVignette 1 to 3 (low to high): the angle off the line of sight
     // where it starts to darken, and where it is black. As in Meta's comfort vignette, moving
     // and turning both close it in (but not a snap turn, which has no motion to feel), within
     // VIGNETTE_IN seconds. It stays closed while the motion goes on, through the pauses
@@ -495,7 +495,7 @@ namespace
         llassert_always(20.f / 15.f < VIGNETTE_JUMP);                     // nor is flying at 20 m/s at 15 fps
     }
 
-    // SLVRLaserColor: the laser's colour by the name the settings window stores; red otherwise.
+    // CosyVRLaserColor: the laser's colour by the name the settings window stores; red otherwise.
     LLColor4 laserColour(const std::string& name)
     {
         static const std::pair<const char*, LLColor4> COLOURS[] = {
@@ -514,8 +514,8 @@ namespace
 
     LLColor4 laserColour() // as set, with its opacity
     {
-        static LLCachedControl<std::string> colour_name(gSavedSettings, "SLVRLaserColor", "red");
-        static LLCachedControl<F32> opacity(gSavedSettings, "SLVRLaserOpacity", 1.f);
+        static LLCachedControl<std::string> colour_name(gSavedSettings, "CosyVRLaserColor", "red");
+        static LLCachedControl<F32> opacity(gSavedSettings, "CosyVRLaserOpacity", 1.f);
         LLColor4 colour = laserColour(colour_name);
         colour.mV[VALPHA] = llclamp((F32)opacity, LASER_MIN_OPACITY, 1.f);
         return colour;
@@ -596,16 +596,16 @@ void LLViewerVR::updateEnabled()
         }
         mPanelVisible = mChatOnly = mUnread = false; // VR starts with the panel hidden; the menu button shows it
         // The sizes and distances the panel and keyboard were last given.
-        mPanelWidth = llclamp(gSavedSettings.getF32("SLVRPanelWidth"), PANEL_NARROW, PANEL_WIDE);
-        mPanelDistance = llclamp(gSavedSettings.getF32("SLVRPanelDistance"), PANEL_NEAR, PANEL_FAR);
-        mKeyboardWidth = llclamp(gSavedSettings.getF32("SLVRKeyboardWidth"), KEYBOARD_NARROW, KEYBOARD_WIDE);
-        mKeyboardAhead = llclamp(gSavedSettings.getF32("SLVRKeyboardReach"), PANEL_NEAR, PANEL_FAR);
+        mPanelWidth = llclamp(gSavedSettings.getF32("CosyVRPanelWidth"), PANEL_NARROW, PANEL_WIDE);
+        mPanelDistance = llclamp(gSavedSettings.getF32("CosyVRPanelDistance"), PANEL_NEAR, PANEL_FAR);
+        mKeyboardWidth = llclamp(gSavedSettings.getF32("CosyVRKeyboardWidth"), KEYBOARD_NARROW, KEYBOARD_WIDE);
+        mKeyboardAhead = llclamp(gSavedSettings.getF32("CosyVRKeyboardReach"), PANEL_NEAR, PANEL_FAR);
         applyGraphics(true);
         gIdleCallbacks.addFunction(onIdle, this);
         // Instant messages; nearby chat comes through noteChat().
         mIMConnection = LLIMModel::instance().addNewMsgCallback([this](const LLSD& msg)
         {
-            static LLCachedControl<bool> private_only(gSavedSettings, "SLVRMessageDotPrivateOnly", true);
+            static LLCachedControl<bool> private_only(gSavedSettings, "CosyVRMessageDotPrivateOnly", true);
             const LLIMModel::LLIMSession* session = LLIMModel::instance().findIMSession(msg["session_id"].asUUID());
             if (!msg["is_region_msg"].asBoolean() && (!private_only || (session && session->isP2PSessionType())))
             {
@@ -692,9 +692,9 @@ void LLViewerVR::beginEye()
         // avatar's own eyes instead: where mouselook puts the camera (see
         // LLAgentCamera::calcCameraPositionTargetGlobal()), heading where the avatar faces.
         // A script or a seat taking the camera (a follow camera, a fixed view) would move and
-        // turn the view without the user, what sickens most in VR: with SLVRIgnoreScriptCamera
-        // the view stays at the eyes then too. Only SLVR's own zoom moves it.
-        static LLCachedControl<bool> keep_eyes(gSavedSettings, "SLVRIgnoreScriptCamera", true);
+        // turn the view without the user, what sickens most in VR: with CosyVRIgnoreScriptCamera
+        // the view stays at the eyes then too. Only CosyVR's own zoom moves it.
+        static LLCachedControl<bool> keep_eyes(gSavedSettings, "CosyVRIgnoreScriptCamera", true);
         const ECameraMode mode = gAgentCamera.getCameraMode();
         if (gAgentCamera.getFocusOnAvatar())
         {
@@ -734,10 +734,10 @@ void LLViewerVR::beginEye()
                     head.mV[VZ] -= fixup;
                 }
                 mBaseOrigin = gAgentAvatarp->getRenderPosition() + head * gAgentAvatarp->getRenderRotation();
-                // SLVREyeHeightMode 1: the eyes at the user's own height above the avatar's feet,
+                // CosyVREyeHeightMode 1: the eyes at the user's own height above the avatar's feet,
                 // so the world has the size the body knows, however tall the avatar is.
-                static LLCachedControl<S32> eye_mode(gSavedSettings, "SLVREyeHeightMode", 0);
-                static LLCachedControl<F32> body_height(gSavedSettings, "SLVRBodyHeight", 1.7f);
+                static LLCachedControl<S32> eye_mode(gSavedSettings, "CosyVREyeHeightMode", 0);
+                static LLCachedControl<F32> body_height(gSavedSettings, "CosyVRBodyHeight", 1.7f);
                 if (eye_mode == 1)
                 {
                     const F32 feet = gAgentAvatarp->getRenderPosition().mV[VZ] - gAgentAvatarp->getPelvisToFoot();
@@ -764,7 +764,7 @@ void LLViewerVR::beginEye()
         mEye = 0;
 
         mInputFresh = mBackend.getInput(mInput);
-        static LLCachedControl<bool> left_handed(gSavedSettings, "SLVRLeftHanded", false);
+        static LLCachedControl<bool> left_handed(gSavedSettings, "CosyVRLeftHanded", false);
         if (mInputFresh && left_handed)
         {
             swapHands(mInput);
@@ -973,8 +973,8 @@ void LLViewerVR::updatePointer()
     }
     if (mGrabbing) // let go: the next session starts with this size and distance
     {
-        gSavedSettings.setF32("SLVRPanelWidth", mPanelWidth);
-        gSavedSettings.setF32("SLVRPanelDistance", mPanelDistance);
+        gSavedSettings.setF32("CosyVRPanelWidth", mPanelWidth);
+        gSavedSettings.setF32("CosyVRPanelDistance", mPanelDistance);
     }
     mGrabbing = false;
 
@@ -1368,7 +1368,7 @@ void LLViewerVR::updateVignette(F32 yaw)
 // image's farthest corner; it closes in to the size its setting gives.
 void LLViewerVR::drawVignette()
 {
-    static LLCachedControl<S32> level(gSavedSettings, "SLVRVignette", 2);
+    static LLCachedControl<S32> level(gSavedSettings, "CosyVRVignette", 2);
     if (level < 1 || mVignette <= 0.f)
     {
         return;
@@ -1413,11 +1413,11 @@ void LLViewerVR::drawVignette()
     gUIProgram.unbind();
 }
 
-// SLVRBlink: the view goes black and fades back in over a jump (a snap turn, a teleport),
+// CosyVRBlink: the view goes black and fades back in over a jump (a snap turn, a teleport),
 // which the eyes take far better than the jump itself.
 void LLViewerVR::blink()
 {
-    static LLCachedControl<bool> on(gSavedSettings, "SLVRBlink", true);
+    static LLCachedControl<bool> on(gSavedSettings, "CosyVRBlink", true);
     if (on)
     {
         mBlink = 1.f;
@@ -1441,11 +1441,11 @@ void LLViewerVR::drawBlink()
     gUIProgram.unbind();
 }
 
-// Vibrates a hand (0 the pointing one) unless SLVRHaptics is off.
+// Vibrates a hand (0 the pointing one) unless CosyVRHaptics is off.
 void LLViewerVR::buzz(S32 hand, F32 amplitude, F32 seconds)
 {
-    static LLCachedControl<bool> haptics(gSavedSettings, "SLVRHaptics", true);
-    static LLCachedControl<bool> left_handed(gSavedSettings, "SLVRLeftHanded", false);
+    static LLCachedControl<bool> haptics(gSavedSettings, "CosyVRHaptics", true);
+    static LLCachedControl<bool> left_handed(gSavedSettings, "CosyVRLeftHanded", false);
     if (haptics)
     {
         mBackend.vibrate(left_handed ? 1 - hand : hand, amplitude, seconds);
@@ -1460,11 +1460,11 @@ void LLViewerVR::recenter()
     buzz(1, 0.5f, 0.05f);
 }
 
-// SLVRPanelFollow: once the eyes turn well away from the panel, it glides back in front of
+// CosyVRPanelFollow: once the eyes turn well away from the panel, it glides back in front of
 // them, square on, at its distance.
 void LLViewerVR::followPanel()
 {
-    static LLCachedControl<bool> follow(gSavedSettings, "SLVRPanelFollow", false);
+    static LLCachedControl<bool> follow(gSavedSettings, "CosyVRPanelFollow", false);
     // On a hidden panel, the windows shown on it follow too (the settings did not).
     const LLFloater* popped = !mPanelVisible ? poppedAnchor() : nullptr;
     if (!follow || !(mPanelVisible || popped) || mGrabbing || mTitleDrag || mEye < 0)
@@ -1624,8 +1624,8 @@ void LLViewerVR::drawControllers()
 {
     const F32 HALF[3] = { 0.018f, 0.015f, 0.055f }; // metres along the controller's right, up and forward
     const float RIGHT[3] = { 1.f, 0.f, 0.f }, UP[3] = { 0.f, 1.f, 0.f }, FORWARD[3] = { 0.f, 0.f, -1.f };
-    static LLCachedControl<bool> left_handed(gSavedSettings, "SLVRLeftHanded", false);
-    static LLCachedControl<bool> show(gSavedSettings, "SLVRShowControllers", true);
+    static LLCachedControl<bool> left_handed(gSavedSettings, "CosyVRLeftHanded", false);
+    static LLCachedControl<bool> show(gSavedSettings, "CosyVRShowControllers", true);
     if (!show)
     {
         return; // the lasers alone
@@ -1876,7 +1876,7 @@ void LLViewerVR::pressWrist()
         showSettings();
         if (!mChatOnly)
         {
-            placePanel(LLFloaterReg::findInstance("slvr_settings"));
+            placePanel(LLFloaterReg::findInstance("cosyvr_settings"));
         }
         break;
     case 3:
@@ -1901,7 +1901,7 @@ void LLViewerVR::pressWrist()
     buzz(0, PRESS_STRENGTH, PRESS_TIME);
 }
 
-// SLVRVRGraphics: lighter graphics while in VR. Every eye is a frame of its own, and the frame
+// CosyVRVRGraphics: lighter graphics while in VR. Every eye is a frame of its own, and the frame
 // rate is what comfort rests on most. Set as unsaved values: what is saved stays the user's
 // own settings, even if the viewer goes down in VR, and they come back as VR is switched off.
 // Called every frame in VR, so that switching the setting takes effect at once.
@@ -1911,7 +1911,7 @@ void LLViewerVR::applyGraphics(bool in_vr)
     static const Cap CAPS[] = { { "RenderShadowDetail", 0.f }, { "RenderScreenSpaceReflections", 0.f },
                                 { "RenderDepthOfField", 0.f }, { "RenderMirrors", 0.f },
                                 { "RenderFarClip", 96.f }, { "RenderAvatarMaxNonImpostors", 8.f } };
-    static LLCachedControl<bool> lighter(gSavedSettings, "SLVRVRGraphics", true);
+    static LLCachedControl<bool> lighter(gSavedSettings, "CosyVRVRGraphics", true);
     const bool vr = in_vr && lighter;
     if (vr == mGraphicsApplied)
     {
@@ -1947,7 +1947,7 @@ bool LLViewerVR::measureHeight(F32& body_height)
         return false;
     }
     body_height = eyes + EYES_BELOW_TOP;
-    gSavedSettings.setF32("SLVRBodyHeight", body_height);
+    gSavedSettings.setF32("CosyVRBodyHeight", body_height);
     LL_INFOS("VR") << "Measured: eyes " << eyes << " m above the floor" << LL_ENDL;
     return true;
 }
@@ -1957,7 +1957,7 @@ F32 LLViewerVR::panelRadius() const
     // Bent round the eyes at its distance; not past a half turn, however near and wide. In
     // every mode (Sinan: set curved, a flat window means nothing): a window shown alone stays
     // square on to the eyes, the panel being turned round the eyes to it (placeAlong()).
-    static LLCachedControl<bool> curved(gSavedSettings, "SLVRCurvedPanel", true);
+    static LLCachedControl<bool> curved(gSavedSettings, "CosyVRCurvedPanel", true);
     return curved && mBackend.canCurve() ? llmax(mPanelDistance, mPanelWidth / 3.f) : 0.f;
 }
 
@@ -2486,7 +2486,7 @@ void LLViewerVR::drawMessageDot(F32 aside, const LLColor4& colour)
 
 void LLViewerVR::noteChat(const LLChat& chat)
 {
-    static LLCachedControl<bool> private_only(gSavedSettings, "SLVRMessageDotPrivateOnly", true);
+    static LLCachedControl<bool> private_only(gSavedSettings, "CosyVRMessageDotPrivateOnly", true);
     if (chat.mSourceType == CHAT_SOURCE_AGENT && !private_only)
     {
         noteMessage(chat.mFromID);
@@ -2545,8 +2545,8 @@ void LLViewerVR::placePanel(const LLView* around)
 // eyes on its top menus turned it away). Moving and resizing it holds until it is hidden.
 void LLViewerVR::resetPanelSize()
 {
-    mPanelWidth = llclamp((F32)gSavedSettings.getControl("SLVRPanelWidth")->getDefault().asReal(), PANEL_NARROW, PANEL_WIDE);
-    mPanelDistance = llclamp((F32)gSavedSettings.getControl("SLVRPanelDistance")->getDefault().asReal(), PANEL_NEAR, PANEL_FAR);
+    mPanelWidth = llclamp((F32)gSavedSettings.getControl("CosyVRPanelWidth")->getDefault().asReal(), PANEL_NARROW, PANEL_WIDE);
+    mPanelDistance = llclamp((F32)gSavedSettings.getControl("CosyVRPanelDistance")->getDefault().asReal(), PANEL_NEAR, PANEL_FAR);
 }
 
 // Metres from the panel's middle to a window's (in the panel's plane, right and up); none
@@ -2641,19 +2641,19 @@ void LLViewerVR::requestScreenshot()
 
 namespace
 {
-    // Pictures\SLVR: outside the viewer's folder, so screenshots survive reinstalling it.
+    // Pictures\CosyVR: outside the viewer's folder, so screenshots survive reinstalling it.
     std::string screenshotFolder()
     {
         std::string folder;
         PWSTR pictures = nullptr;
         if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_Pictures, 0, nullptr, &pictures)))
         {
-            folder = ll_convert_wide_to_string(std::wstring(pictures)) + "\\SLVR";
+            folder = ll_convert_wide_to_string(std::wstring(pictures)) + "\\CosyVR";
         }
         CoTaskMemFree(pictures);
         if (folder.empty())
         {
-            folder = gDirUtilp->getOSUserDir() + "\\SLVR";
+            folder = gDirUtilp->getOSUserDir() + "\\CosyVR";
         }
         LLFile::mkdir(folder);
         return folder;
@@ -2680,7 +2680,7 @@ void LLViewerVR::saveScreenshot(ShotLayer eye_image, ShotLayer panel, ShotLayer 
     const std::time_t now = std::time(nullptr);
     std::tm local{};
     localtime_s(&local, &now);
-    std::strftime(stamp, sizeof(stamp), "SLVR_%Y-%m-%d_%H-%M-%S.png", &local);
+    std::strftime(stamp, sizeof(stamp), "CosyVR_%Y-%m-%d_%H-%M-%S.png", &local);
     const std::string path = screenshotFolder() + "\\" + stamp;
     make_ui_sound("UISndSnapshot");
 
@@ -2853,13 +2853,13 @@ void LLViewerVR::pressKeyboard(S32 hand)
     }
 }
 
-// The SLVR settings (wrist menu, keyboard's settings key); where they go is settingsOpened().
+// The CosyVR settings (wrist menu, keyboard's settings key); where they go is settingsOpened().
 void LLViewerVR::showSettings()
 {
-    LLFloaterReg::showInstance("slvr_settings", LLSD(), true);
+    LLFloaterReg::showInstance("cosyvr_settings", LLSD(), true);
 }
 
-// The SLVR settings opened, from anywhere (the top menu too, which only shows the window).
+// The CosyVR settings opened, from anywhere (the top menu too, which only shows the window).
 // Over a hidden panel or the chat alone they come up alone, in front of the eyes, as a window
 // opened from a menu does (see updatePopped()); the whole panel showing with them was not
 // asked for.
@@ -2912,8 +2912,8 @@ void LLViewerVR::releaseKeyboard(S32 hand)
                                   mKeyboardCentre[1] - (mEyes[0].pos[1] + mEyes[1].pos[1]) / 2.f,
                                   mKeyboardCentre[2] - (mEyes[0].pos[2] + mEyes[1].pos[2]) / 2.f);
         mKeyboardAhead = llclamp(from_eyes.length(), PANEL_NEAR, PANEL_FAR);
-        gSavedSettings.setF32("SLVRKeyboardWidth", mKeyboardWidth);
-        gSavedSettings.setF32("SLVRKeyboardReach", mKeyboardAhead);
+        gSavedSettings.setF32("CosyVRKeyboardWidth", mKeyboardWidth);
+        gSavedSettings.setF32("CosyVRKeyboardReach", mKeyboardAhead);
     }
     if (mRepeatHand == hand)
     {
@@ -3082,10 +3082,10 @@ void LLViewerVR::applyInput()
             buzz(1, PRESS_STRENGTH, PRESS_TIME); // felt in the walking hand: now running
         }
     }
-    static LLCachedControl<S32> walk_direction(gSavedSettings, "SLVRWalkDirection", 0);
+    static LLCachedControl<S32> walk_direction(gSavedSettings, "CosyVRWalkDirection", 0);
     if ((walk || strafe) && mFirstPerson && isAgentAvatarValid() && !gAgentAvatarp->isSitting())
     {
-        // Forward is where the head looks (SLVRWalkDirection 0) or the walking hand points
+        // Forward is where the head looks (CosyVRWalkDirection 0) or the walking hand points
         // (1), not where the avatar happened to face: turn the avatar there, and the tracking
         // space back by as much so that the view stays put.
         const bool by_hand = walk_direction == 1 && input.left_aim_valid;
@@ -3146,7 +3146,7 @@ void LLViewerVR::applyInput()
         startZoom();
     }
 
-    // Right stick: sideways turns in steps, one step per push, or smoothly (SLVRSmoothTurn) at
+    // Right stick: sideways turns in steps, one step per push, or smoothly (CosyVRSmoothTurn) at
     // a rate that grows with the push past the dead zone; up and down is jump/fly up
     // and crouch/fly down like Page Up and Page Down, and held up it starts flying.
     const F32 x = input.turn[0], y = input.turn[1];
@@ -3187,7 +3187,7 @@ void LLViewerVR::applyInput()
             gAgentCamera.cameraOrbitAround(-x * step);
         }
     }
-    static LLCachedControl<bool> smooth_turn(gSavedSettings, "SLVRSmoothTurn", false);
+    static LLCachedControl<bool> smooth_turn(gSavedSettings, "CosyVRSmoothTurn", false);
     if (fabsf(x) < STICK_OFF)
     {
         mTurned = false;

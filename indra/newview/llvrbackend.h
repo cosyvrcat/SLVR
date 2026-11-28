@@ -1,10 +1,10 @@
 /**
  * @file llvrbackend.h
- * @brief SLVR: thin VR runtime interface. No runtime (OpenXR) types leak out of here,
+ * @brief CosyVR: thin VR runtime interface. No runtime (OpenXR) types leak out of here,
  * so the viewer-side code (llviewerVR) does not depend on the VR API in use.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
- * SLVR, based on the P373R VR Mod. LGPL 2.1, see LICENSE.
+ * CosyVR Viewer, based on the P373R VR Mod. LGPL 2.1, see LICENSE.
  * $/LicenseInfo$
  */
 

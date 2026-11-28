@@ -34,7 +34,7 @@
 #include "llagent.h" //  Get state values from here
 #include "llattachmentsmgr.h"
 #include "llagentcamera.h"
-#include "llviewerVR.h" // SLVR
+#include "llviewerVR.h" // CosyVR
 #include "llagentwearables.h"
 #include "llhudeffecttrail.h"
 #include "llhudmanager.h"
@@ -1472,7 +1472,7 @@ void LLVOAvatarSelf::restoreMeshData()
 //-----------------------------------------------------------------------------
 void LLVOAvatarSelf::updateAttachmentVisibility(U32 camera_mode)
 {
-    if (gVR.firstPerson()) // SLVR: seen from the avatar's eyes, hide what mouselook hides
+    if (gVR.firstPerson()) // CosyVR: seen from the avatar's eyes, hide what mouselook hides
     {
         camera_mode = CAMERA_MODE_MOUSELOOK;
     }

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""SLVR: turns Meta's controller art into the controller models SLVR draws in VR.
+"""CosyVR: turns Meta's controller art into the controller models CosyVR draws in VR.
 
 The models belong to Meta and are not part of this repository. Download "Meta Quest
 Hardware Art" (Oculus Controller Art) from
@@ -8,14 +8,14 @@ and run:
 
     python convert_controller_models.py <unpacked folder> [<output folder>]
 
-The output folder defaults to SLVR's user settings folder
-(%APPDATA%\\SLVR_x64\\user_settings\\vr_controllers), where the viewer looks for
+The output folder defaults to CosyVR's user settings folder
+(%APPDATA%\\CosyVR_x64\\user_settings\\vr_controllers), where the viewer looks for
 left.mesh/left.png and right.mesh/right.png. Without them it draws plain boxes.
 
 Only the Meta Quest Touch Plus (Quest 3) controllers are converted. The package is ASCII
 FBX, which Blender cannot import, so this reads it itself; no third-party modules.
 
-Output mesh, text: "slvr_controller 1", "vertices N", N lines "x y z nx ny nz u v",
+Output mesh, text: "cosyvr_controller 1", "vertices N", N lines "x y z nx ny nz u v",
 "triangles M", M lines "a b c". Metres, in the frame of the OpenXR aim pose (x right,
 y up, -z where the laser points), triangles counter-clockwise seen from outside.
 """
@@ -118,13 +118,13 @@ def main():
         print(__doc__)
         return 2
     source = os.path.join(sys.argv[1], PACKAGE_DIR)
-    target = sys.argv[2] if len(sys.argv) > 2 else os.path.join(os.environ.get("APPDATA", "."), "SLVR_x64", "user_settings", "vr_controllers")
+    target = sys.argv[2] if len(sys.argv) > 2 else os.path.join(os.environ.get("APPDATA", "."), "CosyVR_x64", "user_settings", "vr_controllers")
     os.makedirs(target, exist_ok=True)
     for side, (model, texture) in SIDES.items():
         vertices, triangles = convert_mesh(os.path.join(source, model))
         extent = check(vertices, triangles)
         with open(os.path.join(target, side + ".mesh"), "w", newline="\n") as out:
-            out.write("slvr_controller 1\nvertices %d\n" % len(vertices))
+            out.write("cosyvr_controller 1\nvertices %d\n" % len(vertices))
             out.writelines("%g %g %g %g %g %g %g %g\n" % v for v in vertices)
             out.write("triangles %d\n" % len(triangles))
             out.writelines("%d %d %d\n" % t for t in triangles)

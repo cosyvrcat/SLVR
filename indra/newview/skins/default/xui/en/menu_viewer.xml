@@ -2904,16 +2904,16 @@
         </menu_item_call>
     </menu>
     
-    <!-- SLVR: labels are put into the SLVR language by llvrlanguage.cpp; these are the fallback. -->
+    <!-- CosyVR: labels are put into the CosyVR language by llvrlanguage.cpp; these are the fallback. -->
     <menu
      create_jump_keys="true"
-     label="SLVR"
-     name="SLVR"
+     label="CosyVR"
+     name="CosyVR"
      tear_off="true"
      visible="true">
         <menu_item_check
          label="VR Headset (Ctrl+Alt+F7)"
-         name="SLVR VR Headset">
+         name="CosyVR VR Headset">
             <menu_item_check.on_check
              control="VREnabled" />
             <menu_item_check.on_click
@@ -2922,20 +2922,20 @@
         </menu_item_check>
         <menu_item_call
          label="Take VR Screenshot (Y)"
-         name="SLVR Screenshot">
+         name="CosyVR Screenshot">
             <menu_item_call.on_click
-             function="SLVR.Screenshot" />
+             function="CosyVR.Screenshot" />
             <menu_item_call.on_enable
              function="CheckControl"
              parameter="VREnabled" />
         </menu_item_call>
         <menu_item_separator />
         <menu_item_call
-         label="SLVR Settings..."
-         name="SLVR Settings">
+         label="CosyVR Settings..."
+         name="CosyVR Settings">
             <menu_item_call.on_click
              function="Floater.Show"
-             parameter="slvr_settings" />
+             parameter="cosyvr_settings" />
         </menu_item_call>
     </menu>
     

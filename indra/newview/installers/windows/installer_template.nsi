@@ -105,7 +105,7 @@ SetOverwrite on							# Overwrite files by default
 #AutoCloseWindow true					# After all files install, close window
 
 # Registry key paths, ours and Microsoft's
-!define LINDEN_KEY      "SOFTWARE\SLVR"
+!define LINDEN_KEY      "SOFTWARE\CosyVR"
 !define INSTNAME_KEY    "${LINDEN_KEY}\${INSTNAME}"
 !define MSCURRVER_KEY   "SOFTWARE\Microsoft\Windows\CurrentVersion"
 !define MSNTCURRVER_KEY "SOFTWARE\Microsoft\Windows NT\CurrentVersion"
@@ -668,7 +668,7 @@ WriteRegStr SHELL_CONTEXT "${INSTNAME_KEY}" "" "$INSTDIR"
 WriteRegStr SHELL_CONTEXT "${INSTNAME_KEY}" "Version" "${VERSION_LONG}"
 WriteRegStr SHELL_CONTEXT "${INSTNAME_KEY}" "Shortcut" "$INSTSHORTCUT"
 WriteRegStr SHELL_CONTEXT "${INSTNAME_KEY}" "Exe" "$VIEWER_EXE"
-WriteRegStr SHELL_CONTEXT "${MSUNINSTALL_KEY}" "Publisher" "SLVR (unofficial, based on Firestorm Viewer)"
+WriteRegStr SHELL_CONTEXT "${MSUNINSTALL_KEY}" "Publisher" "CosyVR Viewer (unofficial, based on Firestorm Viewer)"
 WriteRegStr SHELL_CONTEXT "${MSUNINSTALL_KEY}" "URLInfoAbout" "https://www.firestormviewer.org"
 WriteRegStr SHELL_CONTEXT "${MSUNINSTALL_KEY}" "URLUpdateInfo" "https://www.firestormviewer.org/downloads"
 WriteRegStr SHELL_CONTEXT "${MSUNINSTALL_KEY}" "HelpLink" "https://www.firestormviewer.org/support"
@@ -1015,28 +1015,28 @@ Push $2
 # Required since ProfileImagePath is of type REG_EXPAND_SZ
     ExpandEnvStrings $2 $2
 
-# Delete files in \Users\<User>\AppData\Roaming\SLVR
+# Delete files in \Users\<User>\AppData\Roaming\CosyVR
 # Remove all settings files but leave any other .txt files to preserve the chat logs
-    RMDir /r "$2\AppData\Roaming\SLVR\logs"
-    RMDir /r "$2\AppData\Roaming\SLVR\browser_profile"
-    RMDir /r "$2\AppData\Roaming\SLVR\user_settings"
-    Delete  "$2\AppData\Roaming\SLVR\*.xml"
-    Delete  "$2\AppData\Roaming\SLVR\*.bmp"
-    Delete  "$2\AppData\Roaming\SLVR\search_history.txt"
-    Delete  "$2\AppData\Roaming\SLVR\plugin_cookies.txt"
-    Delete  "$2\AppData\Roaming\SLVR\typed_locations.txt"
-# Delete files in \Users\<User>\AppData\Local\SLVR
+    RMDir /r "$2\AppData\Roaming\CosyVR\logs"
+    RMDir /r "$2\AppData\Roaming\CosyVR\browser_profile"
+    RMDir /r "$2\AppData\Roaming\CosyVR\user_settings"
+    Delete  "$2\AppData\Roaming\CosyVR\*.xml"
+    Delete  "$2\AppData\Roaming\CosyVR\*.bmp"
+    Delete  "$2\AppData\Roaming\CosyVR\search_history.txt"
+    Delete  "$2\AppData\Roaming\CosyVR\plugin_cookies.txt"
+    Delete  "$2\AppData\Roaming\CosyVR\typed_locations.txt"
+# Delete files in \Users\<User>\AppData\Local\CosyVR
     ${If} ${ISOPENSIM} == "0"
         ${If} ${IS64BIT} == "0"
-            RMDir /r "$2\AppData\Local\SLVR"				#Delete the Havok cache folder
+            RMDir /r "$2\AppData\Local\CosyVR"				#Delete the Havok cache folder
         ${Else}
-            RMDir /r "$2\AppData\Local\SLVR_x64"			#Delete the OpenSim cache folder
+            RMDir /r "$2\AppData\Local\CosyVR_x64"			#Delete the OpenSim cache folder
         ${EndIf}
     ${Else}
         ${If} ${IS64BIT} == "0"
-            RMDir /r "$2\AppData\Local\SLVROS"			#Delete the Havok cache folder
+            RMDir /r "$2\AppData\Local\CosyVROS"			#Delete the Havok cache folder
         ${Else}
-            RMDir /r "$2\AppData\Local\SLVROS_x64"		#Delete the OpenSim cache folder
+            RMDir /r "$2\AppData\Local\CosyVROS_x64"		#Delete the OpenSim cache folder
         ${EndIf}
     ${EndIf}
 
@@ -1049,11 +1049,11 @@ Pop $2
 Pop $1
 Pop $0
 
-# Delete files in ProgramData\SLVR
+# Delete files in ProgramData\CosyVR
 Push $0
   ReadRegStr $0 SHELL_CONTEXT "${MSCURRVER_KEY}\Explorer\Shell Folders" "Common AppData"
   StrCmp $0 "" +2
-  RMDir /r "$0\SLVR"
+  RMDir /r "$0\CosyVR"
 Pop $0
 
 Keep:

@@ -67,7 +67,7 @@ void LLNotificationManager::init()
 //--------------------------------------------------------------------------
 void LLNotificationManager::onChat(const LLChat& msg, const LLSD &args)
 {
-    gVR.noteChat(msg); // SLVR: a dot in the headset while the UI panel is hidden
+    gVR.noteChat(msg); // CosyVR: a dot in the headset while the UI panel is hidden
     if(mChatHandler)
         mChatHandler->processChat(msg, args);
 }

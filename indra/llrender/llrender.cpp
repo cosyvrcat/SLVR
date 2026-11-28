@@ -1345,7 +1345,7 @@ void LLRender::setSceneBlendType(eBlendType type)
     }
 }
 
-// SLVR: while set, ordinary alpha blending accumulates alpha as coverage instead of squaring
+// CosyVR: while set, ordinary alpha blending accumulates alpha as coverage instead of squaring
 // it. For drawing the UI into an empty, see-through image (the VR panel, llviewerVR.cpp).
 bool gGLCoverageAlpha = false;
 

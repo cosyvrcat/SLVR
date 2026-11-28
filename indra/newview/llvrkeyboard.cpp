@@ -1,9 +1,9 @@
 /**
  * @file llvrkeyboard.cpp
- * @brief SLVR: the on-screen keyboard shown in the headset, on a layer of its own.
+ * @brief CosyVR: the on-screen keyboard shown in the headset, on a layer of its own.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
- * SLVR, based on the P373R VR Mod. LGPL 2.1, see LICENSE.
+ * CosyVR Viewer, based on the P373R VR Mod. LGPL 2.1, see LICENSE.
  * $/LicenseInfo$
  */
 
@@ -142,7 +142,7 @@ namespace
     // phone keyboards learn only from what is typed). A word in one of those lines of the
     // logs counts this much.
     const U32 OWN_WEIGHT = 3;
-    // Under that, the keyboard language's word list (app_settings/slvr_words, most frequent
+    // Under that, the keyboard language's word list (app_settings/cosyvr_words, most frequent
     // first), as a phone keyboard's dictionary: words never written are suggested and swiped
     // too. Its first word counts DICTIONARY_WEIGHT, the DICTIONARY_HALF-th half that, the
     // 1000th a tenth: below one of the user's own words.
@@ -150,7 +150,7 @@ namespace
     // What typing in private messages taught, kept from one login to the next (words and
     // which followed which, with their counts; never the messages), while word suggestions
     // are on. The settings' forget button deletes it.
-    const char* const TYPED_FILE = "slvr_typed_words.txt";
+    const char* const TYPED_FILE = "cosyvr_typed_words.txt";
 
     struct KeyBox { KeyDef def; LLRectf rect; };
 
@@ -803,7 +803,7 @@ void LLVRKeyboard::draw(const Hit hover[2], const LLColor4& trail) const
 
 bool LLVRKeyboard::swipeStart(const Hit& hit, S32 x, S32 y)
 {
-    static LLCachedControl<bool> swipe(gSavedSettings, "SLVRSwipeTyping", true);
+    static LLCachedControl<bool> swipe(gSavedSettings, "CosyVRSwipeTyping", true);
     const std::vector<KeyBox>& boxes = keyBoxes(mPage);
     if (!swipe || mPage != 0 || hit.part != KEY || hit.index < 0 || hit.index >= (S32)boxes.size())
     {
@@ -1099,7 +1099,7 @@ void LLVRKeyboard::learnText(const LLWString& text, U32 weight)
 // nor with word suggestions off.
 void LLVRKeyboard::saveTyped()
 {
-    static LLCachedControl<bool> suggest(gSavedSettings, "SLVRWordSuggestions", true);
+    static LLCachedControl<bool> suggest(gSavedSettings, "CosyVRWordSuggestions", true);
     if (!mTypedDirty || !mTypedLoaded || !suggest || gDirUtilp->getLindenUserDir().empty())
     {
         return;
@@ -1132,8 +1132,8 @@ void LLVRKeyboard::reset()
 
 void LLVRKeyboard::update()
 {
-    static LLCachedControl<bool> suggest(gSavedSettings, "SLVRWordSuggestions", true);
-    static LLCachedControl<bool> swipe(gSavedSettings, "SLVRSwipeTyping", true);
+    static LLCachedControl<bool> suggest(gSavedSettings, "CosyVRWordSuggestions", true);
+    static LLCachedControl<bool> swipe(gSavedSettings, "CosyVRSwipeTyping", true);
     if (mForgotten != sForgotten) // see forgetLearned(); the logs teach it again at the next login
     {
         mForgotten = sForgotten;
@@ -1157,7 +1157,7 @@ void LLVRKeyboard::update()
     {
         mDictionaryCode = language;
         mDictionaryLoading = std::async(std::launch::async, loadDictionary,
-                                        gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, "slvr_words", language + ".txt"));
+                                        gDirUtilp->getExpandedFilename(LL_PATH_APP_SETTINGS, "cosyvr_words", language + ".txt"));
     }
     if (mDictionaryLoading.valid() && mDictionaryLoading.wait_for(std::chrono::seconds(0)) == std::future_status::ready)
     {

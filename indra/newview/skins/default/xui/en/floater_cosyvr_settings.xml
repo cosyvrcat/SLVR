@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes" ?>
-<!-- SLVR: labels are put into the SLVR language by llvrlanguage.cpp; these are the fallback. -->
+<!-- CosyVR: labels are put into the CosyVR language by llvrlanguage.cpp; these are the fallback. -->
 <floater
  legacy_header_height="18"
  can_resize="false"
  height="428"
  layout="topleft"
- name="slvr_settings"
+ name="cosyvr_settings"
  single_instance="true"
  save_rect="true"
- title="SLVR Settings"
+ title="CosyVR Settings"
  width="849">
     <text
      follows="left|top"
@@ -18,7 +18,7 @@
      name="language_label"
      top="34"
      width="170">
-        SLVR language:
+        CosyVR language:
     </text>
     <combo_box
      follows="left|top"
@@ -47,7 +47,7 @@
      top="60"
      width="230" />
     <check_box
-     control_name="SLVRWordSuggestions"
+     control_name="CosyVRWordSuggestions"
      follows="left|top"
      height="16"
      label="Word suggestions and next-word prediction"
@@ -66,7 +66,7 @@
      top="120"
      width="403" />
     <check_box
-     control_name="SLVRSwipeTyping"
+     control_name="CosyVRSwipeTyping"
      follows="left|top"
      height="16"
      label="Swipe typing (glide over the letters)"
@@ -76,7 +76,7 @@
      top="154"
      width="403" />
     <check_box
-     control_name="SLVRMessageDotPrivateOnly"
+     control_name="CosyVRMessageDotPrivateOnly"
      follows="left|top"
      height="16"
      label="Message dot only for private chats"
@@ -104,7 +104,7 @@
      top="210"
      width="230" />
     <slider
-     control_name="SLVRLaserOpacity"
+     control_name="CosyVRLaserOpacity"
      decimal_digits="2"
      follows="left|top"
      height="16"
@@ -119,7 +119,7 @@
      top="244"
      width="401" />
     <check_box
-     control_name="SLVRHaptics"
+     control_name="CosyVRHaptics"
      follows="left|top"
      height="16"
      label="Controller vibration"
@@ -129,7 +129,7 @@
      top="274"
      width="403" />
     <check_box
-     control_name="SLVRShowControllers"
+     control_name="CosyVRShowControllers"
      follows="left|top"
      height="16"
      label="Show the controllers (off: lasers only)"
@@ -139,7 +139,7 @@
      top="304"
      width="403" />
     <check_box
-     control_name="SLVRCurvedPanel"
+     control_name="CosyVRCurvedPanel"
      follows="left|top"
      height="16"
      label="Curved panel"
@@ -149,7 +149,7 @@
      top="334"
      width="403" />
     <check_box
-     control_name="SLVRPanelFollow"
+     control_name="CosyVRPanelFollow"
      follows="left|top"
      height="16"
      label="Panel follows my view"
@@ -159,7 +159,7 @@
      top="364"
      width="403" />
     <check_box
-     control_name="SLVRVRGraphics"
+     control_name="CosyVRVRGraphics"
      follows="left|top"
      height="16"
      label="Lighter graphics in VR (smoother)"
@@ -169,7 +169,7 @@
      top="394"
      width="403" />
     <check_box
-     control_name="SLVRSmoothTurn"
+     control_name="CosyVRSmoothTurn"
      follows="left|top"
      height="16"
      label="Smooth turning (off: in steps)"
@@ -197,7 +197,7 @@
      top="60"
      width="230" />
     <slider
-     control_name="SLVRSmoothTurnSpeed"
+     control_name="CosyVRSmoothTurnSpeed"
      decimal_digits="0"
      follows="left|top"
      height="16"
@@ -230,7 +230,7 @@
      top="120"
      width="230" />
     <check_box
-     control_name="SLVRBlink"
+     control_name="CosyVRBlink"
      follows="left|top"
      height="16"
      label="Blink over snap turns and teleports"
@@ -258,7 +258,7 @@
      top="180"
      width="230" />
     <check_box
-     control_name="SLVRLeftHanded"
+     control_name="CosyVRLeftHanded"
      follows="left|top"
      height="16"
      label="Left-handed (swap the controllers)"
@@ -268,7 +268,7 @@
      top="214"
      width="403" />
     <check_box
-     control_name="SLVRIgnoreScriptCamera"
+     control_name="CosyVRIgnoreScriptCamera"
      follows="left|top"
      height="16"
      label="Keep my eyes&apos; view when scripts move the camera"
@@ -296,7 +296,7 @@
      top="270"
      width="230" />
     <slider
-     control_name="SLVRBodyHeight"
+     control_name="CosyVRBodyHeight"
      decimal_digits="2"
      follows="left|top"
      height="16"

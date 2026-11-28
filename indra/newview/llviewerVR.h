@@ -1,13 +1,13 @@
 /**
  * @file llviewerVR.h
- * @brief SLVR: stereo rendering of the viewer into a VR headset.
+ * @brief CosyVR: stereo rendering of the viewer into a VR headset.
  *
  * Follows the P373R VR Mod's approach: display() renders the scene once per eye and
  * the finished window image is handed to the headset. Unlike the original, each eye
  * uses the pose and (asymmetric) field of view reported by the runtime.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
- * SLVR, based on the P373R VR Mod. LGPL 2.1, see LICENSE.
+ * CosyVR Viewer, based on the P373R VR Mod. LGPL 2.1, see LICENSE.
  * $/LicenseInfo$
  */
 
@@ -67,8 +67,8 @@ public:
     // a message from someone else lights a dot in view (instant messages are seen directly).
     void noteChat(const LLChat& chat);
 
-    // Y button and the SLVR menu: saves what the right eye sees, the panel and keyboard
-    // included, as a PNG in Pictures\SLVR.
+    // Y button and the CosyVR menu: saves what the right eye sees, the panel and keyboard
+    // included, as a PNG in Pictures\CosyVR.
     void requestScreenshot();
 
     // The settings window's "measure my height": the user's height from how high the eyes
@@ -77,7 +77,7 @@ public:
 
     void shutdown();
 
-    void settingsOpened(LLFloater* settings); // the SLVR settings window, see showSettings()
+    void settingsOpened(LLFloater* settings); // the CosyVR settings window, see showSettings()
 private:
     void updateEnabled();
     void setEyeCamera();
@@ -197,7 +197,7 @@ private:
     bool mSnapped = false;      // a snap turn this frame, which the vignette leaves out
     LLFrameTimer mRecenterTimer; // X held for this long
     bool mRecentered = false;    // and that recentred, once per hold
-    bool mOwnZoom = false;       // the zoom camera is SLVR's own, not a script's (see beginEye())
+    bool mOwnZoom = false;       // the zoom camera is CosyVR's own, not a script's (see beginEye())
     F32 mBlink = 0.f;            // how dark the view is, 1 black: fading back in after a jump
     bool mGraphicsApplied = false; // the lighter VR graphics are in effect, see applyGraphics()
     // What the lasers were on last frame, for the tick as they move onto a key or a control.
@@ -213,7 +213,7 @@ private:
     S32 mWristItem = -1;        // item under the laser, or -1
     S32 mWristX = 0, mWristY = 0;
     float mWristCentre[3] = {}, mWristRot[4] = { 0.f, 0.f, 0.f, 1.f };
-    bool mPanelFollowing = false; // the panel glides back in front of the eyes (SLVRPanelFollow)
+    bool mPanelFollowing = false; // the panel glides back in front of the eyes (CosyVRPanelFollow)
     bool mTriggerOnPanel = false, mGripOnPanel = false, mGripOnKeyboard = false; // where the press went; its release follows
     bool mTriggerOnKeyboard = false, mZoomOnKeyboard = false;
     bool mZoomStarted = false;  // the left trigger was held long enough to zoom

@@ -1,10 +1,10 @@
 /**
  * @file llvrlanguage.h
- * @brief SLVR: the language of SLVR's own menu, settings and messages, chosen apart from the
- * viewer's, and the on-screen keyboard layouts. Both come from app_settings/slvr_languages.xml.
+ * @brief CosyVR: the language of CosyVR's own menu, settings and messages, chosen apart from the
+ * viewer's, and the on-screen keyboard layouts. Both come from app_settings/cosyvr_languages.xml.
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
- * SLVR, based on the P373R VR Mod. LGPL 2.1, see LICENSE.
+ * CosyVR Viewer, based on the P373R VR Mod. LGPL 2.1, see LICENSE.
  * $/LicenseInfo$
  */
 
@@ -26,20 +26,20 @@ namespace LLVRLanguage
 
     const std::vector<Language>& all();
 
-    // SLVRLanguage, or while that is empty the viewer's UI language; English when it has none.
+    // CosyVRLanguage, or while that is empty the viewer's UI language; English when it has none.
     const Language& current();
 
-    // SLVRKeyboardLayout, or while that is empty current(); English when that has no layout.
+    // CosyVRKeyboardLayout, or while that is empty current(); English when that has no layout.
     const Language& keyboard();
 
     // A text of current(), else the English one, else the key itself (so a gap shows).
     std::string text(const std::string& key);
 
-    // After the menus are built: puts the SLVR menu into current(), and again on every change.
+    // After the menus are built: puts the CosyVR menu into current(), and again on every change.
     void init();
     void apply();
 
-    // LLViewerFloaterReg: the SLVR settings window, "slvr_settings".
+    // LLViewerFloaterReg: the CosyVR settings window, "cosyvr_settings".
     void registerFloater();
 }
 

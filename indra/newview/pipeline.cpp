@@ -4396,7 +4396,7 @@ void LLPipeline::renderGeomPostDeferred(LLCamera& camera)
 
     bool done_atmospherics = LLPipeline::sRenderingHUDs; //skip atmospherics on huds
     bool done_water_haze = done_atmospherics;
-    // <SLVR> HUDs have no water, and the mask pass ends on the window's framebuffer: the VR
+    // <CosyVR> HUDs have no water, and the mask pass ends on the window's framebuffer: the VR
     // panel draws its HUDs into a framebuffer LLRenderTarget knows nothing about.
     bool done_water_exclusion = LLPipeline::sRenderingHUDs;
 

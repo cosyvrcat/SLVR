@@ -1,16 +1,16 @@
 /**
  * @file llvrkeyboard.h
- * @brief SLVR: the on-screen keyboard shown in the headset, on a layer of its own.
+ * @brief CosyVR: the on-screen keyboard shown in the headset, on a layer of its own.
  *
  * Draws itself into a fixed-size image and says what lies at a point of it; where the image
  * is placed and how the lasers reach it is up to LLViewerVR. Types into whatever text field
  * has the keyboard focus, like the real keyboard, and suggests word completions and the
  * next word, learned from what the user wrote in private messages (the chat logs, and
  * typing here, kept between logins), over the keyboard language's word list. The letters come from the
- * layout chosen in the SLVR settings (see llvrlanguage.h).
+ * layout chosen in the CosyVR settings (see llvrlanguage.h).
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
- * SLVR, based on the P373R VR Mod. LGPL 2.1, see LICENSE.
+ * CosyVR Viewer, based on the P373R VR Mod. LGPL 2.1, see LICENSE.
  * $/LicenseInfo$
  */
 
@@ -55,7 +55,7 @@ public:
     enum EPress { TYPED, REPEATS, SETTINGS };
     EPress press(const Hit& hit);
 
-    // Swipe typing (SLVRSwipeTyping): the trigger pressed on a letter starts a swipe instead
+    // Swipe typing (CosyVRSwipeTyping): the trigger pressed on a letter starts a swipe instead
     // of typing it (true); the laser's points (image pixels) follow while it is held; on the
     // release the word whose keys the path went over is typed, or the letter alone if the
     // laser never left its key.

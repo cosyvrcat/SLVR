@@ -81,7 +81,7 @@
 #include "llviewershadermgr.h"
 #include "llviewertexturelist.h"
 #include "llviewerwindow.h"
-#include "llviewerVR.h" // SLVR
+#include "llviewerVR.h" // CosyVR
 #include "llvoavatarself.h"
 #include "llvograss.h"
 #include "llworld.h"
@@ -860,7 +860,7 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
             gPipeline.toggleRenderType(LLPipeline::RENDER_TYPE_HUD_PARTICLES);
         }
 
-        // SLVR: in VR the scene is rendered once per eye; endEye() below jumps back here.
+        // CosyVR: in VR the scene is rendered once per eye; endEye() below jumps back here.
         sec:
         if (!for_snapshot)
         {
@@ -1186,7 +1186,7 @@ void display(bool rebuild, F32 zoom_factor, int subfield, bool for_snapshot)
         if (!for_snapshot)
         {
             render_ui();
-            if (gVR.endEye()) // SLVR: left eye done, render the right eye
+            if (gVR.endEye()) // CosyVR: left eye done, render the right eye
             {
                 goto sec;
             }
@@ -1660,7 +1660,7 @@ void render_ui(F32 zoom_factor, int subfield)
         }
 // [/RLVa:KB]
         LLGLState::checkStates();
-        if (!gVR.rendersEye()) // SLVR: in VR the HUDs go on the UI panel, see LLViewerVR::drawPanel()
+        if (!gVR.rendersEye()) // CosyVR: in VR the HUDs go on the UI panel, see LLViewerVR::drawPanel()
         {
             render_hud_attachments();
         }
@@ -1698,7 +1698,7 @@ void render_ui(F32 zoom_factor, int subfield)
         {
             LL_PROFILE_ZONE_NAMED_CATEGORY_UI("UI 2D"); //LL_RECORD_BLOCK_TIME(FTM_RENDER_UI_2D);
             LLHUDObject::renderAll();
-            if (!gVR.rendersEye()) // SLVR: in VR the flat UI goes on a panel, see LLViewerVR::drawPanel()
+            if (!gVR.rendersEye()) // CosyVR: in VR the flat UI goes on a panel, see LLViewerVR::drawPanel()
             {
                 render_ui_2d();
             }
@@ -2114,6 +2114,6 @@ void render_disconnected_background()
 
 void display_cleanup()
 {
-    gVR.shutdown(); // SLVR
+    gVR.shutdown(); // CosyVR
     gDisconnectedImagep = nullptr;
 }

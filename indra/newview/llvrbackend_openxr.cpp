@@ -1,9 +1,9 @@
 /**
  * @file llvrbackend_openxr.cpp
- * @brief SLVR: OpenXR implementation of LLVRBackend (OpenGL via XR_KHR_opengl_enable, Windows/WGL).
+ * @brief CosyVR: OpenXR implementation of LLVRBackend (OpenGL via XR_KHR_opengl_enable, Windows/WGL).
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
- * SLVR, based on the P373R VR Mod. LGPL 2.1, see LICENSE.
+ * CosyVR Viewer, based on the P373R VR Mod. LGPL 2.1, see LICENSE.
  * $/LicenseInfo$
  */
 
@@ -28,7 +28,7 @@
 #include <vector>
 
 // shortcut: Windows/WGL only and a single session (file-static state); add other
-// platform bindings here if SLVR is ever built for Linux or macOS.
+// platform bindings here if CosyVR is ever built for Linux or macOS.
 namespace
 {
     struct EyeTarget
@@ -286,8 +286,8 @@ namespace
     bool initInput()
     {
         XrActionSetCreateInfo set_info{ XR_TYPE_ACTION_SET_CREATE_INFO };
-        snprintf(set_info.actionSetName, XR_MAX_ACTION_SET_NAME_SIZE, "slvr");
-        snprintf(set_info.localizedActionSetName, XR_MAX_LOCALIZED_ACTION_SET_NAME_SIZE, "SLVR");
+        snprintf(set_info.actionSetName, XR_MAX_ACTION_SET_NAME_SIZE, "cosyvr");
+        snprintf(set_info.localizedActionSetName, XR_MAX_LOCALIZED_ACTION_SET_NAME_SIZE, "CosyVR");
         if (!xrOk(xrCreateActionSet(sInstance, &set_info, &sActionSet), "xrCreateActionSet"))
         {
             sActionSet = XR_NULL_HANDLE;
@@ -468,7 +468,7 @@ bool LLVRBackend::init(std::string& error)
 
     const char* const enabled_extensions[] = { XR_KHR_OPENGL_ENABLE_EXTENSION_NAME, XR_KHR_COMPOSITION_LAYER_CYLINDER_EXTENSION_NAME };
     XrInstanceCreateInfo instance_info{ XR_TYPE_INSTANCE_CREATE_INFO };
-    snprintf(instance_info.applicationInfo.applicationName, XR_MAX_APPLICATION_NAME_SIZE, "SLVR");
+    snprintf(instance_info.applicationInfo.applicationName, XR_MAX_APPLICATION_NAME_SIZE, "CosyVR Viewer");
     instance_info.applicationInfo.applicationVersion = 1;
     instance_info.applicationInfo.apiVersion = XR_MAKE_VERSION(1, 0, 0);
     instance_info.enabledExtensionCount = sCanCurve ? 2 : 1;
@@ -546,7 +546,7 @@ bool LLVRBackend::init(std::string& error)
     {
         sSession = XR_NULL_HANDLE;
         return fail(session_result == XR_ERROR_GRAPHICS_DEVICE_INVALID
-                    ? "The viewer is rendering on a different GPU than the headset uses. Run SLVR on the same GPU as the VR runtime."
+                    ? "The viewer is rendering on a different GPU than the headset uses. Run CosyVR Viewer on the same GPU as the VR runtime."
                     : "Could not create the VR session (" + resultName(session_result) + ").");
     }
     sAlive = true;

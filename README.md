@@ -1,16 +1,16 @@
-<p align="center"><img src="doc/slvr/cover.jpg" alt="SLVR: Second Life in virtual reality" width="100%"></p>
+<p align="center"><img src="doc/cosyvr/cover.jpg" alt="CosyVR Viewer: Second Life in virtual reality" width="100%"></p>
 
-# SLVR
+# CosyVR Viewer
 
-**Second Life in virtual reality.** SLVR is a Second Life viewer with native OpenXR support,
+**Second Life in virtual reality.** CosyVR Viewer is a Second Life viewer with native OpenXR support,
 built on the current Firestorm Viewer. Put on a headset and you see the world from your
 avatar's own eyes, in stereo and at true scale. You walk, fly, teleport and chat with your
 controllers, and the full viewer interface floats in front of you on a panel you can move.
 
 > [!IMPORTANT]
-> SLVR is an independent, experimental project. It is **not affiliated with, endorsed by or
+> CosyVR Viewer is an independent, experimental project. It is **not affiliated with, endorsed by or
 > supported by the Firestorm Project or Linden Lab**. Please do not ask Firestorm support for
-> help with SLVR.
+> help with CosyVR Viewer.
 
 This repository holds **source code only**. No builds are published here.
 
@@ -18,7 +18,7 @@ This repository holds **source code only**. No builds are published here.
 
 ## Highlights
 
-- **Native OpenXR.** No SteamVR or OpenVR layer is needed. SLVR runs on any OpenXR runtime
+- **Native OpenXR.** No SteamVR or OpenVR layer is needed. CosyVR Viewer runs on any OpenXR runtime
   with OpenGL support. It is developed on Meta Quest 3 through Virtual Desktop.
 - **Your avatar's eyes.** You get a first-person view at the avatar's eye height, with head
   tracking and the horizon kept level. An optional mode uses your own body height instead.
@@ -92,7 +92,7 @@ This repository holds **source code only**. No builds are published here.
   own controller art (see [Controller models](#controller-models)). Without them, simple
   boxes show where your hands are. They can be hidden, leaving only the lasers.
 - VR screenshots of what the right eye sees, panel and keyboard included, saved as PNG files
-  to `Pictures\SLVR`.
+  to `Pictures\CosyVR`.
 
 ### On-screen keyboard
 - A keyboard on its own layer that can be typed with both hands, with a symbols page,
@@ -104,7 +104,7 @@ This repository holds **source code only**. No builds are published here.
   IM window; nearby chat, groups and other people's lines are left out), over a word list
   for the keyboard's language, as a phone keyboard does: words you have never written are
   suggested and swiped too. What typing taught is kept between logins as word counts only,
-  never messages, and a button in the SLVR settings forgets it. Word lists for English,
+  never messages, and a button in the CosyVR settings forgets it. Word lists for English,
   Turkish, Danish, German, Spanish, French, Italian, Polish, Portuguese and Russian.
 - Swipe typing: hold the right trigger on the first letter and glide over the others; the
   word is typed as you let go, with a fading trail in your laser's colour behind the
@@ -115,7 +115,7 @@ This repository holds **source code only**. No builds are published here.
   Portuguese and Russian.
 
 ### Languages
-- SLVR's own menus, settings and messages are available in 13 languages: English, Turkish,
+- CosyVR Viewer's own menus, settings and messages are available in 13 languages: English, Turkish,
   Azerbaijani, Danish, German, Spanish, French, Italian, Polish, Portuguese, Russian,
   Japanese and Chinese.
 
@@ -141,7 +141,7 @@ button stays on the left.
 | Lift the left controller and look at it | Wrist menu |
 
 To switch VR on or off, use **World > VR Headset** or **Ctrl+Alt+F7**. All options are in
-**SLVR > SLVR Settings**.
+**CosyVR > CosyVR Settings**.
 
 ## Requirements
 
@@ -161,17 +161,17 @@ The controller models belong to Meta and are not part of this repository. To see
    and unpack it.
 2. Run the converter, which needs only Python 3:
    ```
-   python scripts/slvr/convert_controller_models.py <unpacked folder>
+   python scripts/cosyvr/convert_controller_models.py <unpacked folder>
    ```
-   It writes the Touch Plus models into `%APPDATA%\SLVR_x64\user_settings\vr_controllers`.
-   SLVR picks them up the next time VR starts.
+   It writes the Touch Plus models into `%APPDATA%\CosyVR_x64\user_settings\vr_controllers`.
+   CosyVR Viewer picks them up the next time VR starts.
 
 Meta allows the art to be used to show the matching controller in a VR application. See
 the attribution file in the package.
 
 ## Building
 
-SLVR builds exactly like Firestorm. The steps are in [doc/building_windows.md](doc/building_windows.md).
+CosyVR Viewer builds exactly like Firestorm. The steps are in [doc/building_windows.md](doc/building_windows.md).
 The differences:
 
 - Use the `ReleaseFS_open` configuration.
@@ -194,7 +194,7 @@ The VR code lives in `indra/newview`:
 
 ## Status
 
-SLVR is under active development and tested on a Meta Quest 3. Every version is tested in
+CosyVR Viewer is under active development and tested on a Meta Quest 3. Every version is tested in
 the headset before the next one builds on it.
 
 | Version | What it added |
@@ -203,7 +203,7 @@ the headset before the next one builds on it.
 | 0.6.11 | Keyboard word lists for 10 languages under what the chat logs teach, your own lines counting most |
 | 0.6.10 | Keyboard half a height higher and a little to the right, turned to face you |
 | 0.6.9 | Curved panel in every mode, no window cut off at the panel's edge, windows in front stay there when the full panel comes up, notices no longer push the window in front aside, wrist menu needs a lift |
-| 0.6.8 | Keyboard lower and a little more tilted, back at the distance you last dropped it; settings from the SLVR menu also open beside the chat |
+| 0.6.8 | Keyboard lower and a little more tilted, back at the distance you last dropped it; settings from the CosyVR menu also open beside the chat |
 | 0.6.7 | Keyboard nearer and more upright, dialogs beside the chat when there is no room above, settings beside the chat on the full panel, the panel follows only once you look past its edge |
 | 0.6.6 | Dialogs and alerts stack above the chat window, shop dialogs stay out of the hidden panel, windows on a hidden panel follow you, the keyboard sits higher, a wider default panel distance, swipe typing that leaves quick presses alone |
 | 0.6.5 | Alerts and object questions over a hidden panel, menus and dialogs square on to the eyes, keyboard in windows opened over a hidden panel, settings alone from the keyboard too |
@@ -214,7 +214,7 @@ the headset before the next one builds on it.
 | 0.6.0 | Arc teleport, push-to-talk, recentring, running, haptics, wrist menu, curved panel, left-handed mode, own-height mode, script camera guard, VR text scale, lighter VR graphics, two-column settings |
 | 0.5.5 | Smooth turning, comfort vignette, laser colour and opacity |
 | 0.5.4 | See-through HUDs; panel, dialogs and keyboard open where you look |
-| 0.5.0 – 0.5.3 | SLVR menu and settings in 13 languages, keyboard layouts, next-word prediction, VR screenshots, script dialogs on a hidden panel |
+| 0.5.0 – 0.5.3 | CosyVR menu and settings in 13 languages, keyboard layouts, next-word prediction, VR screenshots, script dialogs on a hidden panel |
 | 0.4.0 | Quest-style keyboard on its own layer, word suggestions, chat-only mode, message dot |
 | 0.3.x | First-person view, movable panel, HUDs, double click, flying, camera zoom, steadier laser |
 | 0.2.0 | Touch controllers, laser pointer, UI panel |
@@ -230,11 +230,11 @@ Planned next: video recording in VR and voice dictation for the keyboard.
   rewritten for OpenXR.
 - Licensed under the GNU Lesser General Public License 2.1, like the viewer it is based on.
   See [LICENSE](LICENSE) and `doc/LICENSE-source.txt`.
-- The keyboard's word lists (`indra/newview/app_settings/slvr_words`) are cut from Hermit
+- The keyboard's word lists (`indra/newview/app_settings/cosyvr_words`) are cut from Hermit
   Dave's [FrequencyWords](https://github.com/hermitdave/FrequencyWords) 2018 lists, built
   from the OpenSubtitles corpus, under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/);
   see the README there.
 
-SLVR follows Linden Lab's Third Party Viewer Policy. Second Life is a trademark of Linden
-Research, Inc. Meta Quest is a trademark of Meta Platforms, Inc. SLVR is not affiliated with
+CosyVR Viewer follows Linden Lab's Third Party Viewer Policy. Second Life is a trademark of Linden
+Research, Inc. Meta Quest is a trademark of Meta Platforms, Inc. CosyVR Viewer is not affiliated with
 either company.

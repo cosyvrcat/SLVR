@@ -126,8 +126,8 @@ class ViewerManifest(LLManifest,FSViewerManifest):
                 # ... and the entire image filters directory
                 self.path("filters")
 
-                # SLVR: the on-screen keyboard's word lists
-                self.path("slvr_words")
+                # CosyVR: the on-screen keyboard's word lists
+                self.path("cosyvr_words")
 
                 # ... and the included spell checking dictionaries
                 # <FS:LO> Copy dictionaries to a place where the viewer can find them if ran from visual studio
@@ -376,7 +376,7 @@ class ViewerManifest(LLManifest,FSViewerManifest):
 
         #<FS:ND> Don't separate name by whitespace. This break a lot of things in the old FS installer logic.
         #return CHANNEL_VENDOR_BASE + ' ' + app_suffix
-        return "SLVR" # SLVR: own app/exe/install-dir name, installs side by side with Firestorm
+        return "CosyVR" # CosyVR: own app/exe/install-dir name, installs side by side with Firestorm
         #</FS:ND>
 
     def exec_name(self):
@@ -389,7 +389,7 @@ class ViewerManifest(LLManifest,FSViewerManifest):
 
     # <FS:Ansariel> FIRE-30446: Set FriendlyAppName for protocol registrations
     def friendly_app_name(self):
-        return "SLVR"
+        return "CosyVR Viewer"
     # </FS:Ansariel>
 
     def icon_path(self):

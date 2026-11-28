@@ -37,7 +37,7 @@
 #include "llviewerobjectlist.h"
 #include "llviewerregion.h"
 #include "llviewerwindow.h"
-#include "llviewerVR.h" // SLVR
+#include "llviewerVR.h" // CosyVR
 #include "llvovolume.h"
 #include "llworld.h"
 #include "lltoolmgr.h"
@@ -379,7 +379,7 @@ void LLViewerCamera::setPerspective(bool for_selection,
 
     calcProjection(z_far); // Update the projection matrix cache
 
-    if (const F32* t = gVR.eyeTanFov()) // SLVR: asymmetric per-eye projection from the headset
+    if (const F32* t = gVR.eyeTanFov()) // CosyVR: asymmetric per-eye projection from the headset
     {
         proj_mat *= glm::frustum(t[0] * z_near, t[1] * z_near, t[3] * z_near, t[2] * z_near, z_near, z_far);
     }
@@ -680,7 +680,7 @@ void LLViewerCamera::getPixelVectors(const LLVector3 &pos_agent, LLVector3 &up, 
 
     F32 at_dist = to_vec * getAtAxis();
 
-    if (const F32* t = gVR.eyeTanFov()) // SLVR: the eye's own projection
+    if (const F32* t = gVR.eyeTanFov()) // CosyVR: the eye's own projection
     {
         const F32 height_pixels = (F32)getViewHeightInPixels(), width_pixels = height_pixels * getAspect();
         up = getUpAxis() * (at_dist * (t[2] - t[3]) / height_pixels * gViewerWindow->getDisplayScale().mV[VY]);
