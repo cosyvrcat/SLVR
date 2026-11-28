@@ -27,6 +27,7 @@
 #include "llviewercontrol.h"
 #include "llviewermenu.h"
 #include "llviewerVR.h"
+#include "llvrkeyboard.h"
 
 #include <fstream>
 
@@ -120,6 +121,19 @@ namespace
             getChild<LLComboBox>("eye_height")->setCommitCallback([](LLUICtrl* ctrl, const LLSD&)
                                                                   { gSavedSettings.setS32("SLVREyeHeightMode", ctrl->getValue().asInteger()); });
             getChild<LLButton>("measure_height")->setCommitCallback([this](LLUICtrl*, const LLSD&) { measureHeight(); });
+            // Enabled even with suggestions off, so words kept from before can still be deleted.
+            getChild<LLButton>("forget_words")->setCommitCallback([](LLUICtrl*, const LLSD&)
+            {
+                LLNotificationsUtil::add("GenericAlertYesCancel", LLSD().with("MESSAGE", LLVRLanguage::text("forget_words_confirm")), LLSD(),
+                                         [](const LLSD& notification, const LLSD& response)
+                                         {
+                                             if (LLNotificationsUtil::getSelectedOption(notification, response) != 0)
+                                                 return;
+                                             LLVRKeyboard::forgetLearned();
+                                             LLNotificationsUtil::add("SystemMessageTip",
+                                                                      LLSD().with("MESSAGE", LLVRLanguage::text("forget_words_done")));
+                                         });
+            });
             translate();
             return true;
         }
@@ -152,6 +166,7 @@ namespace
                 getChild<LLSliderCtrl>(name)->setLabel(LLVRLanguage::text(name));
             }
             getChild<LLButton>("measure_height")->setLabel(LLVRLanguage::text("measure_height"));
+            getChild<LLButton>("forget_words")->setLabel(LLVRLanguage::text("forget_words"));
 
             LLComboBox* snap = getChild<LLComboBox>("snap_angle");
             snap->removeall();

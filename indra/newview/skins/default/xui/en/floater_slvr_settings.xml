@@ -3,7 +3,7 @@
 <floater
  legacy_header_height="18"
  can_resize="false"
- height="398"
+ height="428"
  layout="topleft"
  name="slvr_settings"
  single_instance="true"
@@ -56,6 +56,15 @@
      name="word_suggestions"
      top="94"
      width="403" />
+    <button
+     follows="left|top"
+     height="23"
+     label="Forget the learned words"
+     layout="topleft"
+     left="12"
+     name="forget_words"
+     top="120"
+     width="403" />
     <check_box
      control_name="SLVRSwipeTyping"
      follows="left|top"
@@ -64,7 +73,7 @@
      layout="topleft"
      left="12"
      name="swipe_typing"
-     top="124"
+     top="154"
      width="403" />
     <check_box
      control_name="SLVRMessageDotPrivateOnly"
@@ -74,7 +83,7 @@
      layout="topleft"
      left="12"
      name="message_dot_private"
-     top="154"
+     top="184"
      width="403" />
     <text
      follows="left|top"
@@ -82,7 +91,7 @@
      layout="topleft"
      left="12"
      name="laser_colour_label"
-     top="184"
+     top="214"
      width="170">
         Laser colour:
     </text>
@@ -92,7 +101,7 @@
      layout="topleft"
      left="185"
      name="laser_colour"
-     top="180"
+     top="210"
      width="230" />
     <slider
      control_name="SLVRLaserOpacity"
@@ -107,7 +116,7 @@
      max_val="1"
      min_val="0.1"
      name="laser_opacity"
-     top="214"
+     top="244"
      width="401" />
     <check_box
      control_name="SLVRHaptics"
@@ -117,7 +126,7 @@
      layout="topleft"
      left="12"
      name="haptics"
-     top="244"
+     top="274"
      width="403" />
     <check_box
      control_name="SLVRShowControllers"
@@ -127,7 +136,7 @@
      layout="topleft"
      left="12"
      name="show_controllers"
-     top="274"
+     top="304"
      width="403" />
     <check_box
      control_name="SLVRCurvedPanel"
@@ -137,7 +146,7 @@
      layout="topleft"
      left="12"
      name="curved_panel"
-     top="304"
+     top="334"
      width="403" />
     <check_box
      control_name="SLVRPanelFollow"
@@ -147,7 +156,7 @@
      layout="topleft"
      left="12"
      name="panel_follow"
-     top="334"
+     top="364"
      width="403" />
     <check_box
      control_name="SLVRVRGraphics"
@@ -157,7 +166,7 @@
      layout="topleft"
      left="12"
      name="performance_preset"
-     top="364"
+     top="394"
      width="403" />
     <check_box
      control_name="SLVRSmoothTurn"

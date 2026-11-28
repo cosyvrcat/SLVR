@@ -12,9 +12,11 @@
 #include "llvrkeyboard.h"
 
 #include "llagent.h"
+#include "fsfloaterim.h"
 #include "llagentui.h"
 #include "llavatarnamecache.h"
 #include "lldir.h"
+#include "llfile.h"
 #include "llfocusmgr.h"
 #include "llfontgl.h"
 #include "llframetimer.h"
@@ -31,7 +33,9 @@
 #include <atomic>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <set>
+#include <sstream>
 #include <vector>
 
 namespace
@@ -133,15 +137,20 @@ namespace
     const size_t LOG_BUDGET = 8 << 20; // bytes of chat log read for suggestions, newest first
     const U32 TYPED_WEIGHT = 5;        // a word typed here counts as much as this many in the logs
     const U32 PAIR_WEIGHT = 10;        // and a word seen after the previous one as this many seen anywhere
-    const U32 LOG_PAIR_MIN = 2;        // a pair seen fewer times in the logs is forgotten: most are chance
-    // The logs are mostly what others wrote (Sinan's: 87 percent); the user's own lines are
-    // what they will write again, as phone keyboards learn only from what is typed.
+    // Only what the user wrote in private messages is learned, from the logs and from typing
+    // (Sinan: what others say nearby, or in groups, means nothing for what one will write;
+    // phone keyboards learn only from what is typed). A word in one of those lines of the
+    // logs counts this much.
     const U32 OWN_WEIGHT = 3;
-    // Under what the logs say, the keyboard language's word list (app_settings/slvr_words,
-    // most frequent first), as a phone keyboard's dictionary: words never seen in the logs
-    // are suggested and swiped too. Its first word counts as this many seen in others'
-    // lines, the DICTIONARY_HALF-th half that, the 1000th a tenth: below the user's own words.
+    // Under that, the keyboard language's word list (app_settings/slvr_words, most frequent
+    // first), as a phone keyboard's dictionary: words never written are suggested and swiped
+    // too. Its first word counts DICTIONARY_WEIGHT, the DICTIONARY_HALF-th half that, the
+    // 1000th a tenth: below one of the user's own words.
     const F32 DICTIONARY_WEIGHT = 2.f, DICTIONARY_HALF = 100.f;
+    // What typing in private messages taught, kept from one login to the next (words and
+    // which followed which, with their counts; never the messages), while word suggestions
+    // are on. The settings' forget button deletes it.
+    const char* const TYPED_FILE = "slvr_typed_words.txt";
 
     struct KeyBox { KeyDef def; LLRectf rect; };
 
@@ -341,9 +350,62 @@ namespace
         return words;
     }
 
-    // Worker thread: what the newest chat logs say, up to LOG_BUDGET bytes; the lines from
-    // one of `own` count OWN_WEIGHT times.
-    LLVRKeyboard::Learned loadLog(std::string dir, std::set<std::string> own)
+    // A chat log of a conversation with one other avatar (LLIMModel::getHistoryFileName()),
+    // by its name without ".txt": not the nearby chat ("chat", or "chat-2026-11-28" with
+    // LogFileNamewithDate), a group's (" (group)") or a conference (" Conference ").
+    bool privateLog(const std::string& stem)
+    {
+        if (stem == "chat" || (stem.size() == 15 && stem.compare(0, 5, "chat-") == 0 && isdigit((unsigned char)stem[5])))
+        {
+            return false;
+        }
+        return stem.find(" (group)") == std::string::npos && stem.find(" Conference") == std::string::npos;
+    }
+
+    // The typed file's text: "count word" or "count word next" a line; and back.
+    std::string typedText(const LLVRKeyboard::Learned& typed)
+    {
+        std::ostringstream out;
+        for (const auto& word : typed.words)
+        {
+            out << word.second << ' ' << word.first << '\n';
+        }
+        for (const auto& pair : typed.pairs)
+        {
+            out << pair.second << ' ' << pair.first << '\n';
+        }
+        return out.str();
+    }
+
+    LLVRKeyboard::Learned parseTyped(const std::string& text)
+    {
+        LLVRKeyboard::Learned typed;
+        std::istringstream in(text);
+        std::string line;
+        while (std::getline(in, line))
+        {
+            std::istringstream fields(line);
+            U32 count = 0;
+            std::string word, next;
+            if (!(fields >> count >> word) || count == 0)
+            {
+                continue;
+            }
+            if (fields >> next)
+            {
+                typed.pairs[word + ' ' + next] += count;
+            }
+            else
+            {
+                typed.words[word] += count;
+            }
+        }
+        return typed;
+    }
+
+    // Worker thread: what the user wrote in the newest private chat logs (privateLog(), lines
+    // from one of `own`), up to LOG_BUDGET bytes of them; and the typed file at `typed_path`.
+    std::pair<LLVRKeyboard::Learned, LLVRKeyboard::Learned> loadLog(std::string dir, std::set<std::string> own, std::string typed_path)
     {
         namespace fs = std::filesystem;
         LLVRKeyboard::Learned learned;
@@ -351,7 +413,7 @@ namespace
         std::vector<fs::directory_entry> logs;
         for (const fs::directory_entry& entry : fs::directory_iterator(fs::path(ll_convert_string_to_wide(dir)), error))
         {
-            if (entry.is_regular_file(error) && entry.path().extension() == L".txt")
+            if (entry.is_regular_file(error) && entry.path().extension() == L".txt" && privateLog(ll_convert_wide_to_string(entry.path().stem().wstring())))
             {
                 logs.push_back(entry);
             }
@@ -373,7 +435,10 @@ namespace
                 line_end = line_end == std::string::npos ? text.size() : line_end;
                 LLWString from;
                 const LLWString message = logMessage(utf8str_to_wstring(text.substr(line_start, line_end - line_start)), &from);
-                countText(message, learned, own.count(wstring_to_utf8str(from)) ? OWN_WEIGHT : 1);
+                if (own.count(wstring_to_utf8str(from)))
+                {
+                    countText(message, learned, OWN_WEIGHT);
+                }
                 line_start = line_end + 1;
             }
             if (budget == 0)
@@ -381,13 +446,24 @@ namespace
                 break;
             }
         }
-        for (auto it = learned.pairs.begin(); it != learned.pairs.end();)
+        std::ifstream file(fs::path(ll_convert_string_to_wide(typed_path)), std::ios::binary);
+        const LLVRKeyboard::Learned typed = parseTyped(std::string(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>()));
+        LL_INFOS("VR") << "Word suggestions: " << learned.words.size() << " words, " << learned.pairs.size() << " word pairs from "
+                       << logs.size() << " private chat logs; " << typed.words.size() << " words typed before" << LL_ENDL;
+        return { learned, typed };
+    }
+
+    // The keyboard types into a private message: a conversation with one other avatar.
+    bool privateMessage()
+    {
+        for (LLView* view = dynamic_cast<LLView*>(gFocusMgr.getKeyboardFocus()); view; view = view->getParent())
         {
-            it = it->second < LOG_PAIR_MIN ? learned.pairs.erase(it) : std::next(it);
+            if (const FSFloaterIM* im = dynamic_cast<const FSFloaterIM*>(view))
+            {
+                return im->isP2PSessionType();
+            }
         }
-        LL_INFOS("VR") << "Word suggestions: " << learned.words.size() << " words, " << learned.pairs.size()
-                       << " word pairs from " << logs.size() << " chat logs" << LL_ENDL;
-        return learned;
+        return false;
     }
 
     // Calls f(key, count) for the entries of a word map that begin with prefix.
@@ -807,11 +883,15 @@ void LLVRKeyboard::swipeEnd()
     type(mSwiped);
     mSwipeOthers[0] = words[1];
     mSwipeOthers[1] = words[2];
-    const std::string key = wordKey(words[0]);
-    mTyped.words[key] += 1;
-    if (!mPrevious.empty() && !after_word)
+    if (privateMessage())
     {
-        mTyped.pairs[mPrevious + ' ' + key] += 1;
+        const std::string key = wordKey(words[0]);
+        mTyped.words[key] += 1;
+        if (!mPrevious.empty() && !after_word)
+        {
+            mTyped.pairs[mPrevious + ' ' + key] += 1;
+        }
+        mTypedDirty = true;
     }
     mShift = mCapsLock;
 }
@@ -922,11 +1002,15 @@ LLVRKeyboard::EPress LLVRKeyboard::press(const Hit& hit)
             gViewerWindow->handleKey(KEY_BACKSPACE, MASK_NONE);
         }
         type(word + LLWString(1, ' '));
-        const std::string key = wordKey(word);
-        mTyped.words[key] += 1;
-        if (!mPrevious.empty() && !swiped)
+        if (privateMessage())
         {
-            mTyped.pairs[mPrevious + ' ' + key] += 1;
+            const std::string key = wordKey(word);
+            mTyped.words[key] += 1;
+            if (!mPrevious.empty() && !swiped)
+            {
+                mTyped.pairs[mPrevious + ' ' + key] += 1;
+            }
+            mTypedDirty = true;
         }
         mShift = mCapsLock;
         return TYPED;
@@ -960,9 +1044,10 @@ LLVRKeyboard::EPress LLVRKeyboard::press(const Hit& hit)
     {
         LLWString text;
         S32 cursor = 0;
-        if (focusedText(text, cursor))
+        if (focusedText(text, cursor) && privateMessage())
         {
             learnText(text, 1); // what the user writes is what they will write again
+            saveTyped();
         }
         gViewerWindow->handleKey(KEY_RETURN, MASK_NONE);
         break;
@@ -1007,6 +1092,33 @@ void LLVRKeyboard::type(const LLWString& text)
 void LLVRKeyboard::learnText(const LLWString& text, U32 weight)
 {
     countText(text, mTyped, weight);
+    mTypedDirty = true;
+}
+
+// To TYPED_FILE, when it changed: not before the file was read (it would lose what it held),
+// nor with word suggestions off.
+void LLVRKeyboard::saveTyped()
+{
+    static LLCachedControl<bool> suggest(gSavedSettings, "SLVRWordSuggestions", true);
+    if (!mTypedDirty || !mTypedLoaded || !suggest || gDirUtilp->getLindenUserDir().empty())
+    {
+        return;
+    }
+    mTypedDirty = false;
+    std::ofstream file(std::filesystem::path(ll_convert_string_to_wide(gDirUtilp->getExpandedFilename(LL_PATH_PER_SL_ACCOUNT, TYPED_FILE))),
+                       std::ios::binary | std::ios::trunc);
+    file << typedText(mTyped);
+}
+
+U32 LLVRKeyboard::sForgotten = 0;
+
+void LLVRKeyboard::forgetLearned()
+{
+    if (!gDirUtilp->getLindenUserDir().empty())
+    {
+        LLFile::remove(gDirUtilp->getExpandedFilename(LL_PATH_PER_SL_ACCOUNT, TYPED_FILE), ENOENT);
+    }
+    ++sForgotten; // the keyboard lets go of what it holds at its next update()
 }
 
 void LLVRKeyboard::reset()
@@ -1015,20 +1127,29 @@ void LLVRKeyboard::reset()
     mShift = mCapsLock = mSwiping = false;
     mTrail.clear();
     mSwiped.clear();
+    saveTyped();
 }
 
 void LLVRKeyboard::update()
 {
     static LLCachedControl<bool> suggest(gSavedSettings, "SLVRWordSuggestions", true);
     static LLCachedControl<bool> swipe(gSavedSettings, "SLVRSwipeTyping", true);
+    if (mForgotten != sForgotten) // see forgetLearned(); the logs teach it again at the next login
+    {
+        mForgotten = sForgotten;
+        mLog = mTyped = Learned();
+        mTypedDirty = false;
+        mContext.clear();
+    }
     if ((suggest || swipe) && !mLoadStarted) // swipe typing finds its words there too
     {
         const std::string dir = gDirUtilp->getPerAccountChatLogsDir();
         const std::set<std::string> own = ownNames();
-        if (!dir.empty() && !own.empty()) // empty until logged in
+        if (!dir.empty() && !own.empty() && !gDirUtilp->getLindenUserDir().empty()) // empty until logged in
         {
             mLoadStarted = true;
-            mLoading = std::async(std::launch::async, loadLog, dir, own);
+            mLoadForgotten = sForgotten;
+            mLoading = std::async(std::launch::async, loadLog, dir, own, gDirUtilp->getExpandedFilename(LL_PATH_PER_SL_ACCOUNT, TYPED_FILE));
         }
     }
     const std::string language = LLVRLanguage::keyboard().code;
@@ -1045,7 +1166,20 @@ void LLVRKeyboard::update()
     }
     if (mLoading.valid() && mLoading.wait_for(std::chrono::seconds(0)) == std::future_status::ready)
     {
-        mLog = mLoading.get();
+        const std::pair<Learned, Learned> loaded = mLoading.get();
+        mTypedLoaded = true;
+        if (mLoadForgotten == sForgotten) // nothing read before a forget comes back
+        {
+            mLog = loaded.first;
+            for (const auto& word : loaded.second.words) // with what was typed meanwhile
+            {
+                mTyped.words[word.first] += word.second;
+            }
+            for (const auto& pair : loaded.second.pairs)
+            {
+                mTyped.pairs[pair.first] += pair.second;
+            }
+        }
         mContext.clear(); // suggest again with what the logs said
     }
 
@@ -1205,6 +1339,18 @@ void LLVRKeyboard::selfCheck()
     llassert_always(wstring_to_utf8str(from) == "Ali Resident");
     logMessage(utf8str_to_wstring("[2026/11/20 21:03]  Second Life closed the door"), &from);
     llassert_always(from.empty());
+    // Only conversations with one other avatar are read.
+    llassert_always(privateLog("1atesbocegi") && privateLog("first.last-2026-11") && !privateLog("chat") && !privateLog("chat-2026-11-28")
+                    && !privateLog("Green Tech (group)") && !privateLog("Burka666 Conference hash597394a0-9982-766d-27b8-c75560213b9a"));
+    // The typed file reads back what was written.
+    {
+        Learned typed;
+        typed.words["merhaba"] = 3;
+        typed.words["d\xC3\xBCnya"] = 1;
+        typed.pairs["merhaba d\xC3\xBCnya"] = 2;
+        const Learned back = parseTyped(typedText(typed));
+        llassert_always(back.words == typed.words && back.pairs == typed.pairs);
+    }
     // One of the user's own words outweighs the language's commonest word in the word list.
     llassert_always(dictionaryWeight(0) < OWN_WEIGHT && dictionaryWeight(1000) < dictionaryWeight(999));
     llassert_always(learned.words.size() == 2 && learned.words["merhaba"] == 2 && learned.words["d\xC3\xBCnya"] == 1);

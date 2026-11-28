@@ -5,8 +5,8 @@
  * Draws itself into a fixed-size image and says what lies at a point of it; where the image
  * is placed and how the lasers reach it is up to LLViewerVR. Types into whatever text field
  * has the keyboard focus, like the real keyboard, and suggests word completions and the
- * next word, learned from the chat logs (the user's own lines most) and from what is typed,
- * over the keyboard language's word list. The letters come from the
+ * next word, learned from what the user wrote in private messages (the chat logs, and
+ * typing here, kept between logins), over the keyboard language's word list. The letters come from the
  * layout chosen in the SLVR settings (see llvrlanguage.h).
  *
  * $LicenseInfo:firstyear=2026&license=viewerlgpl$
@@ -67,6 +67,10 @@ public:
     // Back to letters, shift off; when the keyboard goes away.
     void reset();
 
+    // The settings' forget button: deletes what typing in private messages taught (its file),
+    // and the keyboard lets go of everything it learned until the next login.
+    static void forgetLearned();
+
     static void selfCheck();
 
     typedef std::map<std::string, U32> word_map_t;
@@ -75,16 +79,20 @@ public:
 private:
     void type(const LLWString& text);
     void learnText(const LLWString& text, U32 weight);
+    void saveTyped();
     void refreshSuggestions();
 
     S32 mPage = 0;          // 0 letters, 1 digits and symbols
     bool mShift = false, mCapsLock = false;
 
     // Suggestions. Words are kept lower case (UTF-8) with how often they were seen.
-    std::future<Learned> mLoading; // the chat logs, read on a worker thread
+    std::future<std::pair<Learned, Learned>> mLoading; // the private chat logs and the typed file, read on a worker thread
     bool mLoadStarted = false;
     Learned mLog;           // from the chat logs, once loaded
-    Learned mTyped;         // typed or picked on this keyboard, weighted higher
+    Learned mTyped;         // typed or picked on this keyboard in private messages, weighted higher; kept
+    bool mTypedLoaded = false, mTypedDirty = false;
+    U32 mForgotten = 0, mLoadForgotten = 0; // sForgotten when last let go of, and when the load began
+    static U32 sForgotten;
     std::future<word_map_t> mDictionaryLoading;
     word_map_t mDictionary;      // the keyboard language's word list: each word's rank, 0 the commonest
     std::string mDictionaryCode; // whose it is
